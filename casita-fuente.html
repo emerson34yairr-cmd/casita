@@ -1,0 +1,4279 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Casita — un rato tranquilo</title>
+<style>
+  :root {
+    --crema:   #FBF3E3;
+    --crema2:  #F2E4C9;
+    --tinta:   #4C4238;
+    --tinta2:  #8A7A67;
+    --salvia:  #9DBF95;
+    --terra:   #E2916B;
+    --rosa:    #EFB0AA;
+    --cielo:   #CBE7F3;
+    --sombra:  0 6px 18px rgba(76,66,56,.16);
+    --redondo: 18px;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { width:100%; height:100%; overflow:hidden; background:#DDEAF0; overscroll-behavior:none; }
+  body {
+    font-family: ui-rounded, "SF Pro Rounded", "Hiragino Maru Gothic ProN", "Segoe UI Variable", system-ui, sans-serif;
+    color: var(--tinta); user-select:none; touch-action:none;
+  }
+  canvas { display:block; touch-action:none; cursor:default; }
+  body.arrastrando canvas { cursor:grabbing; }
+  body.vista1a canvas { cursor:crosshair; }
+  body.raton canvas { cursor:none; }
+
+  #ui { position:fixed; inset:0; pointer-events:none; padding:14px; }
+  .card {
+    background:rgba(251,243,227,.92); border-radius:var(--redondo);
+    box-shadow:var(--sombra); backdrop-filter:blur(6px);
+  }
+
+  /* ---------- necesidades ---------- */
+  #needs {
+    position:absolute; top:calc(14px + env(safe-area-inset-top)); left:14px;
+    padding:12px 14px; width:190px;
+  }
+  #needs h2 { font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--tinta2); margin-bottom:9px; font-weight:600; }
+  .need { display:flex; align-items:center; gap:8px; margin:7px 0; }
+  .need span.ico { font-size:15px; width:18px; text-align:center; }
+  .need .track { flex:1; height:9px; background:var(--crema2); border-radius:99px; overflow:hidden; }
+  .need .fill { height:100%; width:100%; border-radius:99px; transition:width .3s linear, background .6s; }
+  .need.low .fill { animation:latido 1.1s ease-in-out infinite; }
+  @keyframes latido { 50% { opacity:.45; } }
+
+  /* ---------- reloj ---------- */
+  #clock {
+    position:absolute; top:calc(14px + env(safe-area-inset-top)); right:14px;
+    padding:10px 14px; display:flex; align-items:center; gap:12px;
+  }
+  #hora { font-size:20px; font-weight:600; font-variant-numeric:tabular-nums; letter-spacing:.02em; }
+  #dia { font-size:11px; color:var(--tinta2); letter-spacing:.1em; text-transform:uppercase; }
+  #pausa {
+    pointer-events:auto; cursor:pointer; border:none; background:var(--salvia); color:#fff;
+    width:38px; height:38px; border-radius:12px; font-size:15px; font-family:inherit;
+    box-shadow:0 3px 0 rgba(76,66,56,.18); transition:transform .12s;
+  }
+  #pausa:active { transform:translateY(2px); box-shadow:0 1px 0 rgba(76,66,56,.18); }
+  #mudo {
+    pointer-events:auto; cursor:pointer; border:none; background:var(--crema2); color:var(--tinta2);
+    width:30px; height:30px; border-radius:10px; font-size:14px; font-family:inherit;
+    transition:background .2s, color .2s;
+  }
+  #mudo.off { background:#E4D8C2; color:#B0A28C; }
+
+  /* ---------- estado / ayuda ---------- */
+  #estado {
+    position:absolute; left:50%; transform:translateX(-50%);
+    bottom:calc(18px + env(safe-area-inset-bottom)); padding:9px 18px;
+    font-size:14px; opacity:0; transition:opacity .3s; white-space:nowrap;
+  }
+  #estado.on { opacity:1; }
+  #tips {
+    position:absolute; left:14px; bottom:calc(14px + env(safe-area-inset-bottom));
+    padding:10px 13px; font-size:11.5px; line-height:1.65; color:var(--tinta2); max-width:210px;
+  }
+  #tips b { color:var(--tinta); font-weight:600; }
+  #fps { position:absolute; right:14px; bottom:calc(14px + env(safe-area-inset-bottom)); font-size:11px; color:var(--tinta2); opacity:.7; }
+
+  /* ---------- portada ---------- */
+  #inicio {
+    position:absolute; inset:0; pointer-events:auto; display:flex;
+    flex-direction:column; align-items:center; justify-content:center; gap:16px; text-align:center;
+    background:radial-gradient(circle at 50% 35%, #FDF6E9, #E8DCC6);
+    transition:opacity .5s; padding:24px;
+  }
+  #inicio.ir { opacity:0; pointer-events:none; }
+  #inicio h1 { font-size:40px; font-weight:600; letter-spacing:-.01em; }
+  #inicio h1 em { font-style:normal; color:var(--terra); }
+  #inicio p { color:var(--tinta2); font-size:14.5px; max-width:330px; line-height:1.6; }
+  #barra { width:190px; height:8px; background:var(--crema2); border-radius:99px; overflow:hidden; margin-top:4px; }
+  #barra i { display:block; height:100%; width:0%; background:var(--salvia); border-radius:99px; transition:width .25s; }
+  #entrar {
+    pointer-events:auto; cursor:pointer; margin-top:6px; padding:13px 30px; border:none;
+    background:var(--terra); color:#fff; font-family:inherit; font-size:15px; font-weight:600;
+    letter-spacing:.04em; border-radius:14px; box-shadow:0 4px 0 #C2724F; transition:transform .12s, opacity .3s;
+  }
+  #entrar:active { transform:translateY(3px); box-shadow:0 1px 0 #C2724F; }
+  #entrar[disabled] { opacity:.45; cursor:default; }
+  #denuevo {
+    display:none; pointer-events:auto; cursor:pointer; margin-top:-4px;
+    background:none; border:none; font-family:inherit; font-size:12.5px;
+    color:var(--tinta2); text-decoration:underline; text-underline-offset:3px; padding:6px 10px;
+  }
+  #denuevo:hover { color:var(--terra); }
+
+  /* ---------- vista en primera persona ---------- */
+  #punto {
+    position:absolute; left:50%; top:50%; width:8px; height:8px; margin:-4px 0 0 -4px;
+    border-radius:50%; background:rgba(255,255,255,.85); box-shadow:0 0 0 2px rgba(76,66,56,.35);
+    display:none;
+  }
+  body.vista1a #punto { display:block; }
+  body.vista1a #dock [data-accion="izq"],
+  body.vista1a #dock [data-accion="der"] { opacity:.35; }
+
+  /* ---------- joystick flotante (aparece donde pones el dedo) ---------- */
+  #joyzona {
+    position:absolute; left:0; bottom:0;
+    width:min(46vw, 230px); height:min(52vh, 230px);
+    pointer-events:auto; touch-action:none; display:none;
+  }
+  body.tactil #joyzona { display:block; }
+  #joy {
+    position:absolute; left:22px; bottom:22px; width:124px; height:124px; border-radius:50%;
+    background:rgba(251,243,227,.34); box-shadow:inset 0 0 0 2px rgba(255,255,255,.45);
+    transition:opacity .25s, background .2s; opacity:.75;
+  }
+  #joy i {
+    position:absolute; left:50%; top:50%; width:54px; height:54px; margin:-27px 0 0 -27px;
+    border-radius:50%; background:rgba(251,243,227,.95); box-shadow:0 3px 8px rgba(76,66,56,.28);
+    transition:background .15s;
+  }
+  #joy.on { opacity:1; background:rgba(251,243,227,.5); }
+  #joy.on i { background:var(--salvia); }
+
+  /* ---------- dock ---------- */
+  #dock {
+    position:absolute; right:14px; bottom:calc(14px + env(safe-area-inset-bottom));
+    display:flex; flex-direction:column; align-items:flex-end; gap:10px;
+  }
+  #fila { display:grid; grid-template-columns:repeat(3, 52px); gap:8px; }
+  .mini {
+    width:52px; height:52px; padding:0; border:none; border-radius:15px;
+    background:rgba(251,243,227,.93); color:var(--tinta); font-family:inherit;
+    box-shadow:var(--sombra); pointer-events:auto; cursor:pointer;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px;
+    transition:transform .1s, background .18s, color .18s;
+  }
+  .mini b { font-size:17px; font-weight:400; line-height:1; }
+  .mini i { font-size:8.5px; font-style:normal; letter-spacing:.05em; text-transform:uppercase; opacity:.6; }
+  .mini:active { transform:scale(.9); }
+  .mini.on { background:var(--salvia); color:#fff; }
+  .mini.on i { opacity:.9; }
+
+  #saltar {
+    width:78px; height:78px; border-radius:50%; border:none; display:none;
+    background:var(--terra); color:#fff; font-family:inherit; font-size:12.5px; font-weight:600;
+    letter-spacing:.06em; box-shadow:0 5px 0 #C2724F; pointer-events:auto; cursor:pointer;
+    transition:transform .1s, box-shadow .1s;
+  }
+  #saltar:active { transform:translateY(4px); box-shadow:0 1px 0 #C2724F; }
+  body.tactil #saltar { display:block; }
+
+  /* pantalla baja (móvil en horizontal): todo en una fila, si no se sale */
+  @media (max-height:560px) {
+    #dock { flex-direction:row-reverse; align-items:flex-end; gap:12px; }
+    #fila { grid-template-columns:repeat(6, 46px); gap:6px; }
+    .mini { width:46px; height:46px; border-radius:13px; }
+    .mini b { font-size:15px; }
+    #saltar { width:66px; height:66px; font-size:11px; }
+    #joyzona { height:min(70vh, 200px); }
+    #joy { width:106px; height:106px; left:16px; bottom:16px; }
+    #joy i { width:46px; height:46px; margin:-23px 0 0 -23px; }
+  }
+
+  #pausado {
+    position:absolute; inset:0; display:none; align-items:center; justify-content:center;
+    background:rgba(251,243,227,.55); backdrop-filter:blur(3px); font-size:22px; font-weight:600; letter-spacing:.1em;
+  }
+  #pausado.on { display:flex; }
+
+  /* ---------- modo foto: fuera la interfaz y bandas de cine ---------- */
+  #cine { position:fixed; inset:0; pointer-events:none; opacity:0; transition:opacity .5s; z-index:6; }
+  #cine::before, #cine::after {
+    content:''; position:absolute; left:0; right:0; height:8vh; background:#171310;
+    transform:scaleY(0); transition:transform .55s cubic-bezier(.4,0,.2,1);
+  }
+  #cine::before { top:0; transform-origin:top; }
+  #cine::after { bottom:0; transform-origin:bottom; }
+  body.foto #cine { opacity:1; }
+  body.foto #cine::before, body.foto #cine::after { transform:scaleY(1); }
+  body.foto #needs, body.foto #clock, body.foto #tips, body.foto #dock,
+  body.foto #ayuda, body.foto #fps, body.foto #alinicio { opacity:0 !important; pointer-events:none; }
+  #needs, #clock, #dock { transition:opacity .45s; }
+  #fotoAviso {
+    position:fixed; left:50%; transform:translateX(-50%); bottom:calc(8vh + 18px);
+    color:#F6EEDF; font-size:12.5px; letter-spacing:.06em; opacity:0; transition:opacity .5s;
+    z-index:7; pointer-events:none; text-shadow:0 1px 3px rgba(0,0,0,.5);
+  }
+  body.foto #fotoAviso { opacity:.75; }
+
+  /* ==================== pulido ==================== */
+
+  /* viñeta: oscurece apenas las esquinas y da profundidad al diorama */
+  #vineta {
+    position:fixed; inset:0; pointer-events:none; z-index:0;
+    background:radial-gradient(125% 95% at 50% 42%, rgba(0,0,0,0) 56%, rgba(52,40,28,.22) 100%);
+    opacity:0; transition:opacity 1.2s ease .3s;
+  }
+  body.jugando #vineta { opacity:1; }
+
+  /* la ayuda se aparta sola a los 15 s y vuelve con el botón "?" */
+  #tips { transition:opacity .5s ease, transform .5s ease; }
+  body.ayuda-oculta #tips { opacity:0; transform:translateY(8px); pointer-events:none; }
+  #ayuda {
+    position:absolute; left:14px; bottom:calc(14px + env(safe-area-inset-bottom));
+    width:36px; height:36px; border-radius:50%; border:none; padding:0;
+    background:rgba(251,243,227,.9); color:var(--tinta2); font-family:inherit;
+    font-size:16px; font-weight:600; box-shadow:var(--sombra);
+    pointer-events:auto; cursor:pointer; opacity:0; transform:scale(.8);
+    transition:opacity .4s, transform .4s, color .2s;
+  }
+  body.ayuda-oculta #ayuda { opacity:1; transform:scale(1); }
+  #ayuda:hover { color:var(--terra); }
+  /* en táctil la esquina de abajo a la izquierda es del joystick: el "?" se va arriba */
+  body.tactil #ayuda {
+    left:auto; bottom:auto; right:14px;
+    top:calc(74px + env(safe-area-inset-top)); z-index:5;
+  }
+
+  /* en escritorio los botones táctiles estorban: se quedan tenues hasta que los buscas */
+  body:not(.tactil) .mini { opacity:.5; }
+  body:not(.tactil) #dock:hover .mini { opacity:1; }
+
+  /* pantallas estrechas: el HUD ocupaba media pantalla en un teléfono */
+  @media (max-width:480px) {
+    #needs { width:148px; padding:10px 11px; }
+    #needs h2 { font-size:10px; margin-bottom:6px; }
+    .need { margin:5px 0; gap:7px; }
+    .need span.ico { font-size:13px; width:15px; }
+    .need .track { height:8px; }
+    #clock { padding:8px 11px; gap:9px; }
+    #hora { font-size:17px; }
+    #dia { font-size:9.5px; }
+    #pausa { width:33px; height:33px; font-size:13px; }
+    #tips { max-width:180px; font-size:10.5px; line-height:1.55; padding:9px 11px; }
+    #estado { font-size:12.5px; padding:8px 14px; }
+  }
+
+  /* aviso de una sola vez para añadirlo a la pantalla de inicio del iPhone */
+  #alinicio {
+    position:absolute; left:50%; transform:translateX(-50%) translateY(10px);
+    bottom:calc(96px + env(safe-area-inset-bottom));
+    padding:11px 16px; font-size:12.5px; line-height:1.5; text-align:center;
+    max-width:min(78vw, 300px); color:var(--tinta2);
+    pointer-events:auto; cursor:pointer; opacity:0; transition:opacity .5s, transform .5s;
+  }
+  #alinicio.on { opacity:1; transform:translateX(-50%) translateY(0); }
+  #alinicio b { color:var(--tinta); font-weight:600; }
+</style>
+</head>
+<body>
+<canvas id="lienzo"></canvas>
+
+<div id="vineta"></div>
+
+<div id="ui">
+  <div id="needs" class="card">
+    <h2>Cómo está</h2>
+    <div class="need" data-need="energia"><span class="ico">🌙</span><div class="track"><div class="fill"></div></div></div>
+    <div class="need" data-need="hambre"><span class="ico">🍎</span><div class="track"><div class="fill"></div></div></div>
+    <div class="need" data-need="diversion"><span class="ico">✨</span><div class="track"><div class="fill"></div></div></div>
+  </div>
+
+  <div id="clock" class="card">
+    <div>
+      <div id="hora">08:00</div>
+      <div id="dia">Día 1</div>
+    </div>
+    <button id="pausa" title="Pausa">❚❚</button>
+    <button id="mudo" title="Silencio (M)">♪</button>
+  </div>
+
+  <div id="estado" class="card"></div>
+
+  <div id="tips" class="card">
+    <b>WASD</b> mover &nbsp; <b>Espacio</b> saltar / aletear<br>
+    <b>Clic</b> caminar o usar un mueble<br>
+    <b>Arrastrar</b> mover la vista<br>
+    <b>Botón der.</b> girar &nbsp; <b>rueda</b> zoom<br>
+    <b>V</b> 1ª persona (clic captura el ratón)<br>
+    <b>C</b> gato / ptera &nbsp; <b>F</b> centrar<br>
+    <b>Q E</b> girar &nbsp; <b>R</b> techo &nbsp; <b>P</b> pausa &nbsp; <b>G</b> agua
+  </div>
+  <button id="ayuda" title="Ayuda">?</button>
+  <div id="alinicio" class="card"></div>
+  <div id="fps"></div>
+
+  <div id="punto"></div>
+
+  <div id="joyzona"><div id="joy"><i></i></div></div>
+
+  <div id="dock">
+    <div id="fila">
+      <button class="mini" data-accion="izq"><b>⟲</b><i>girar</i></button>
+      <button class="mini" data-accion="der"><b>⟳</b><i>girar</i></button>
+      <button class="mini" data-accion="centrar"><b>◎</b><i>sigue</i></button>
+      <button class="mini" data-accion="techo"><b>⌂</b><i>auto</i></button>
+      <button class="mini" data-accion="vista"><b>👁</b><i>3ª</i></button>
+      <button class="mini" data-accion="cambiar"><b>🐈</b><i>gato</i></button>
+      <button class="mini" data-accion="foto"><b>📷</b><i>foto</i></button>
+    </div>
+    <button id="saltar"><b>SALTO</b></button>
+  </div>
+
+  <div id="pausado">EN PAUSA</div>
+  <div id="cine"></div>
+  <div id="fotoAviso">MODO FOTO · O para salir</div>
+
+  <div id="inicio">
+    <h1>La <em>casita</em></h1>
+    <p>Una isla pequeña, una casa con luz tibia y alguien que solo quiere pasar un buen rato.</p>
+    <div id="barra"><i></i></div>
+    <button id="entrar" disabled>Preparando la isla…</button>
+    <button id="denuevo">empezar de nuevo</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+'use strict';
+
+/* ============================================================
+   CONSTANTES
+   ============================================================ */
+const CHUNK_SIZE = 16;
+const WORLD_HEIGHT = 40;
+const SEA_LEVEL = 10;
+const GROUND_Y = 16;                 // altura del jardín llano
+const WORLD_CHUNKS = 5;              // chunks de -5 a 4  ->  160x160 bloques (más mar alrededor)
+const ISLA_R = 54;                   // radio de la isla
+const DAY_LENGTH = 600;              // 10 min de reloj = 1 día completo
+const HORA_INICIO = 8;
+
+// casa (centrada en el origen)
+const CASA = { x: 0, z: 0, w: 15, d: 11, alto: 3.3, muro: 0.28 };
+const PATIO = { x: 9.5, z: 7.5, suave: 5 };   // explanada plana alrededor
+
+const AIR = 0, GRASS = 1, DIRT = 2, STONE = 3, SAND = 4, WATER = 5, WOOD = 6, LEAVES = 7, PATH = 8, FLOWERS = 9;
+
+// tiles del atlas: 0 pasto 1 pasto_lado 2 tierra 3 piedra 4 arena
+//                  5 agua 6 tronco_lado 7 tronco_arriba 8 hojas 9 camino 10 pasto_flores
+const BLOCKS = {
+  [GRASS]:   { top:0,  side:1, bottom:2 },
+  [DIRT]:    { top:2,  side:2, bottom:2 },
+  [STONE]:   { top:3,  side:3, bottom:3 },
+  [SAND]:    { top:4,  side:4, bottom:4 },
+  [WATER]:   { top:5,  side:5, bottom:5 },
+  [WOOD]:    { top:7,  side:6, bottom:7 },
+  [LEAVES]:  { top:8,  side:8, bottom:8 },
+  [PATH]:    { top:9,  side:9, bottom:9 },
+  [FLOWERS]: { top:10, side:1, bottom:2 }
+};
+
+// ¿pantalla táctil? ¿teléfono? (ajusta calidad y controles)
+// (un portátil con pantalla táctil tiene maxTouchPoints>1 pero se juega con teclado y
+//  ratón: si hay un puntero fino a mano, no es un aparato táctil)
+// (fino + que pueda "pasar por encima" = ratón o trackpad de verdad; un lápiz es fino
+//  pero no tiene hover, así que un iPad con Pencil sigue contando como táctil)
+const HAY_RATON = typeof matchMedia === 'function' &&
+                  matchMedia('(any-pointer: fine)').matches && matchMedia('(any-hover: hover)').matches;
+const ES_TACTIL = ((typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches) ||
+                   (typeof navigator !== 'undefined' && navigator.maxTouchPoints > 1)) && !HAY_RATON;
+const ES_MOVIL = ES_TACTIL && Math.min(innerWidth, innerHeight) < 820;
+// vibración corta al pulsar (si el aparato la tiene)
+function vibrar(ms) { try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) {} }
+
+const isOpaque = id => id !== AIR && id !== WATER;
+const isSolid  = id => id !== AIR && id !== WATER;
+const IDX = (x, y, z) => (y * CHUNK_SIZE + z) * CHUNK_SIZE + x;
+const key2 = (a, b) => a + ',' + b;
+const clamp = (v, a, b) => v < a ? a : (v > b ? b : v);
+const lerp = (a, b, t) => a + (b - a) * t;
+// interpolación suave entre dos bordes
+const sstep = (a, b, x) => { const t = clamp((x - a) / (b - a || 1e-6), 0, 1); return t * t * (3 - 2 * t); };
+const acerca = (a, b, t) => a + (b - a) * (1 - Math.pow(1 - t, 3));   // suavizado dependiente de dt
+
+/* ============================================================
+   RUIDO
+   ============================================================ */
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+function hash01(x, y, s) {
+  let n = Math.imul(x | 0, 374761393) + Math.imul(y | 0, 668265263) + Math.imul(s | 0, 1442695041);
+  n = n ^ (n >>> 13);
+  n = Math.imul(n, 1274126177);
+  n = n ^ (n >>> 16);
+  return (n >>> 0) / 4294967296;
+}
+class Noise {
+  constructor(seed) {
+    const rnd = mulberry32(seed);
+    const perm = new Uint8Array(256);
+    for (let i = 0; i < 256; i++) perm[i] = i;
+    for (let i = 255; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); const t = perm[i]; perm[i] = perm[j]; perm[j] = t; }
+    this.p = new Uint8Array(512);
+    for (let i = 0; i < 512; i++) this.p[i] = perm[i & 255];
+  }
+  static fade(t) { return t * t * t * (t * (t * 6 - 15) + 10); }
+  grad(h, x, y) {
+    switch (h & 3) { case 0: return x + y; case 1: return -x + y; case 2: return x - y; default: return -x - y; }
+  }
+  perlin(x, y) {
+    const fx = Math.floor(x), fy = Math.floor(y);
+    const X = fx & 255, Y = fy & 255, xf = x - fx, yf = y - fy;
+    const u = Noise.fade(xf), v = Noise.fade(yf), p = this.p;
+    const aa = p[p[X] + Y], ab = p[p[X] + Y + 1], ba = p[p[X + 1] + Y], bb = p[p[X + 1] + Y + 1];
+    const x1 = lerp(this.grad(aa, xf, yf), this.grad(ba, xf - 1, yf), u);
+    const x2 = lerp(this.grad(ab, xf, yf - 1), this.grad(bb, xf - 1, yf - 1), u);
+    return lerp(x1, x2, v);
+  }
+  fbm(x, y, oct = 3, persistence = 0.5, lacunarity = 2) {
+    let amp = 1, freq = 1, sum = 0, norm = 0;
+    for (let i = 0; i < oct; i++) {
+      sum += this.perlin(x * freq, y * freq) * amp;
+      norm += amp; amp *= persistence; freq *= lacunarity;
+    }
+    return sum / norm;
+  }
+}
+
+/* ============================================================
+   TEXTURAS (canvas 16x16, paleta pastel)
+   ============================================================ */
+class Assets {
+  constructor() {
+    this.tiles = [
+      this.tile(this.pastoArriba), this.tile(this.pastoLado), this.tile(this.tierra),
+      this.tile(this.piedra),      this.tile(this.arena),     this.tile(this.agua),
+      this.tile(this.troncoLado),  this.tile(this.troncoArriba), this.tile(this.hojas),
+      this.tile(this.camino),      this.tile(this.flores),
+      this.tile(this.yeso),        this.tile(this.teja),      this.tile(this.duela),
+      this.tile(this.tabla),       this.tile(this.tela),      this.tile(this.liso)
+    ];
+    this.buildAtlas();
+    this.buildUVs();
+    this.buildWaterTexture();
+    this.buildPlanks();
+    this.buildSprites();
+  }
+  tile(painter) {
+    const c = document.createElement('canvas');
+    c.width = c.height = 16;
+    let seed = 0x5EEDCA;
+    for (let i = 0; i < painter.name.length; i++) seed = Math.imul(seed ^ painter.name.charCodeAt(i), 16777619);
+    painter(c.getContext('2d'), mulberry32(seed));
+    return c;
+  }
+  static px(g, x, y, c) { g.fillStyle = c; g.fillRect(x, y, 1, 1); }
+  static pick(rnd, arr) { return arr[Math.floor(rnd() * arr.length)]; }
+  static fill(g, rnd, cols) {
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) Assets.px(g, x, y, Assets.pick(rnd, cols));
+  }
+
+  pastoArriba(g, rnd) { Assets.fill(g, rnd, ['#9BC479', '#A6CD86', '#8FB86E', '#AED28E', '#94BE73']); }
+  pastoLado(g, rnd) {
+    Assets.fill(g, rnd, ['#C6A882', '#CFB28C', '#BC9F79', '#D3B994']);
+    for (let x = 0; x < 16; x++) {
+      const h = 3 + Math.floor(rnd() * 3);
+      for (let y = 0; y < h; y++) Assets.px(g, x, y, Assets.pick(rnd, ['#9BC479', '#A6CD86', '#8FB86E']));
+    }
+  }
+  tierra(g, rnd) { Assets.fill(g, rnd, ['#C6A882', '#CFB28C', '#BC9F79', '#D3B994', '#B69476']); }
+  piedra(g, rnd) {
+    Assets.fill(g, rnd, ['#CFC7BC', '#D8D1C7', '#C4BBB0', '#DDD7CD']);
+    for (let i = 0; i < 10; i++) { const x = Math.floor(rnd() * 15), y = Math.floor(rnd() * 15); Assets.px(g, x, y, '#B9AFA3'); Assets.px(g, x + 1, y, '#B9AFA3'); }
+  }
+  arena(g, rnd) { Assets.fill(g, rnd, ['#D9C69C', '#E2D2AC', '#CFBF93', '#E6DAB9']); }
+  agua(g, rnd) {
+    Assets.fill(g, rnd, ['#7FBCC2', '#8BC7CD', '#75B1B7', '#99D1D7']);
+    for (let i = 0; i < 5; i++) {
+      const y = Math.floor(rnd() * 16), x = Math.floor(rnd() * 11);
+      for (let k = 0; k < 5; k++) Assets.px(g, x + k, y, '#C2ECEF');
+    }
+  }
+  troncoLado(g, rnd) {
+    Assets.fill(g, rnd, ['#C29A70', '#B98F66', '#CBA57B']);
+    for (let x = 1; x < 16; x += 4) {
+      const c = rnd() > 0.5 ? '#A87F58' : '#D6B48C';
+      for (let y = 0; y < 16; y++) if (rnd() > 0.3) Assets.px(g, x, y, c);
+    }
+  }
+  troncoArriba(g, rnd) {
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+      const d = Math.max(Math.abs(x - 7.5), Math.abs(y - 7.5));
+      Assets.px(g, x, y, rnd() > 0.88 ? '#B58B62' : (Math.floor(d) % 2 === 0 ? '#D9B78E' : '#C6A176'));
+    }
+  }
+  hojas(g, rnd) {
+    Assets.fill(g, rnd, ['#8FBE86', '#9BC993', '#83B27A', '#A7D49E', '#79A771']);
+    for (let i = 0; i < 16; i++) Assets.px(g, Math.floor(rnd() * 16), Math.floor(rnd() * 16), '#6C9865');
+  }
+  camino(g, rnd) {
+    Assets.fill(g, rnd, ['#C7B695', '#D0C2A3', '#BCAA8B']);
+    for (let i = 0; i < 26; i++) Assets.px(g, Math.floor(rnd() * 16), Math.floor(rnd() * 16), '#CFBDA0');
+  }
+  flores(g, rnd) {
+    Assets.fill(g, rnd, ['#9BC479', '#A6CD86', '#8FB86E', '#AED28E']);
+    const petalos = ['#F4B9C4', '#FBE3A0', '#E7C7EE', '#FFFFFF'];
+    for (let i = 0; i < 5; i++) {
+      const x = 1 + Math.floor(rnd() * 13), y = 1 + Math.floor(rnd() * 13), c = Assets.pick(rnd, petalos);
+      Assets.px(g, x, y, c); Assets.px(g, x + 1, y, c); Assets.px(g, x, y + 1, c); Assets.px(g, x + 1, y + 1, c);
+      Assets.px(g, x, y, '#F7D774');
+    }
+  }
+
+  // --- texturas de la casa, en escala de grises para poder teñirlas ---
+  yeso(g, rnd) {
+    Assets.fill(g, rnd, ['#F2F0EC', '#EBE9E4', '#F7F5F1', '#E7E4DE']);
+    for (let i = 0; i < 8; i++) Assets.px(g, Math.floor(rnd() * 16), Math.floor(rnd() * 16), '#DEDAD3');
+  }
+  teja(g, rnd) {
+    for (let y = 0; y < 16; y++) {
+      const fila = Math.floor(y / 4), enFila = y % 4;
+      for (let x = 0; x < 16; x++) {
+        let c = enFila === 0 ? '#C4BFB7' : (enFila === 3 ? '#E3E0D9' : '#EFEDE7');
+        if ((x + fila * 3) % 5 === 0) c = '#CBC6BE';
+        Assets.px(g, x, y, rnd() > 0.9 ? '#E6E3DC' : c);
+      }
+    }
+  }
+  duela(g, rnd) {
+    for (let y = 0; y < 16; y++) {
+      const fila = Math.floor(y / 4);
+      const base = fila % 2 ? ['#EDEAE4', '#E6E3DC', '#F2EFE9'] : ['#E9E6E0', '#F0EDE7', '#E3E0D9'];
+      for (let x = 0; x < 16; x++) Assets.px(g, x, y, y % 4 === 0 ? '#CFCAC2' : Assets.pick(rnd, base));
+      Assets.px(g, (fila * 7) % 16, y, '#D6D1C9');
+    }
+  }
+  tabla(g, rnd) {
+    Assets.fill(g, rnd, ['#EDEAE4', '#E5E2DB', '#F3F0EA']);
+    for (let x = 1; x < 16; x += 5) {
+      const c = rnd() > 0.5 ? '#D3CEC6' : '#F6F4EF';
+      for (let y = 0; y < 16; y++) if (rnd() > 0.25) Assets.px(g, x, y, c);
+    }
+  }
+  tela(g, rnd) {
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+      const trama = ((x >> 1) + (y >> 1)) % 2 === 0;
+      Assets.px(g, x, y, trama ? (rnd() > 0.7 ? '#F6F4F0' : '#F0EDE8') : (rnd() > 0.7 ? '#E4E0DA' : '#E9E6E0'));
+    }
+  }
+  liso(g, rnd) {
+    Assets.fill(g, rnd, ['#F1EFEB', '#ECEAE5', '#F5F3EF']);
+  }
+
+  buildAtlas() {
+    this.cols = 5; const escala = 4, ts = 16 * escala;
+    const c = document.createElement('canvas');
+    c.width = c.height = ts * this.cols;
+    const g = c.getContext('2d');
+    g.imageSmoothingEnabled = false;
+    this.tiles.forEach((t, i) => g.drawImage(t, 0, 0, 16, 16, (i % this.cols) * ts, Math.floor(i / this.cols) * ts, ts, ts));
+    const tex = new THREE.CanvasTexture(c);
+    tex.magFilter = THREE.NearestFilter;
+    tex.minFilter = THREE.LinearMipmapLinearFilter;
+    this.atlas = tex;
+  }
+  buildUVs() {
+    const s = 1 / this.cols, e = 0.0018;
+    this.uvRects = [];
+    for (let i = 0; i < this.cols * this.cols; i++) {
+      const col = i % this.cols, row = Math.floor(i / this.cols);
+      this.uvRects.push({ u0: col * s + e, u1: (col + 1) * s - e, v0: 1 - (row + 1) * s + e, v1: 1 - row * s - e });
+    }
+  }
+  uv(i) { return this.uvRects[i]; }
+
+  buildWaterTexture() {
+    const c = document.createElement('canvas');
+    c.width = c.height = 64;
+    const g = c.getContext('2d');
+    g.imageSmoothingEnabled = false;
+    g.drawImage(this.tiles[5], 0, 0, 16, 16, 0, 0, 64, 64);
+    const tex = new THREE.CanvasTexture(c);
+    tex.magFilter = THREE.NearestFilter;
+    tex.minFilter = THREE.LinearMipmapLinearFilter;
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    this.waterTex = tex;
+  }
+
+  // duela de madera clara para el piso de la casa
+  buildPlanks() {
+    const c = document.createElement('canvas');
+    c.width = c.height = 64;
+    const g = c.getContext('2d');
+    const rnd = mulberry32(24601);
+    for (let y = 0; y < 64; y++) for (let x = 0; x < 64; x++) {
+      const t = Math.floor(y / 8);
+      const base = t % 2 ? ['#E6C79C', '#E0BF92', '#EACFA6'] : ['#E2C296', '#EAC9A0', '#DDBB8C'];
+      g.fillStyle = base[Math.floor(rnd() * base.length)];
+      g.fillRect(x, y, 1, 1);
+    }
+    for (let y = 0; y < 64; y += 8) { g.fillStyle = '#C9A87C'; g.fillRect(0, y, 64, 1); }
+    for (let t = 0; t < 8; t++) { g.fillStyle = '#C9A87C'; g.fillRect((t * 23) % 64, t * 8, 1, 8); }
+    const tex = new THREE.CanvasTexture(c);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.magFilter = THREE.NearestFilter;
+    this.planks = tex;
+  }
+
+  // punto suave (luciérnagas) y burbuja de emoji
+  buildSprites() {
+    const c = document.createElement('canvas');
+    c.width = c.height = 32;
+    const g = c.getContext('2d');
+    const grd = g.createRadialGradient(16, 16, 0, 16, 16, 16);
+    grd.addColorStop(0, 'rgba(255,247,200,1)');
+    grd.addColorStop(0.4, 'rgba(255,236,150,.55)');
+    grd.addColorStop(1, 'rgba(255,230,140,0)');
+    g.fillStyle = grd; g.fillRect(0, 0, 32, 32);
+    this.chispa = new THREE.CanvasTexture(c);
+
+    // bolita blanca difusa: sirve de humo y, repetida, de nube
+    const h = document.createElement('canvas');
+    h.width = h.height = 64;
+    const gh = h.getContext('2d');
+    const gr2 = gh.createRadialGradient(32, 32, 0, 32, 32, 32);
+    gr2.addColorStop(0, 'rgba(255,255,255,.95)');
+    gr2.addColorStop(0.45, 'rgba(255,255,255,.55)');
+    gr2.addColorStop(1, 'rgba(255,255,255,0)');
+    gh.fillStyle = gr2; gh.fillRect(0, 0, 64, 64);
+    this.mota = new THREE.CanvasTexture(h);
+
+    // nube: varios bultos pegados, con la base más plana (leen mejor desde arriba)
+    const n = document.createElement('canvas');
+    n.width = 256; n.height = 128;
+    const gn = n.getContext('2d');
+    const rn = mulberry32(918);
+    const bultos = [[70, 78, 44], [120, 62, 56], [172, 76, 42], [96, 84, 38], [148, 86, 36]];
+    for (const [bx, by, br] of bultos) {
+      const gg = gn.createRadialGradient(bx, by, 0, bx, by, br);
+      gg.addColorStop(0, 'rgba(255,255,255,.92)');
+      gg.addColorStop(0.55, 'rgba(255,255,255,.62)');
+      gg.addColorStop(1, 'rgba(255,255,255,0)');
+      gn.fillStyle = gg;
+      gn.beginPath();
+      gn.ellipse(bx + (rn() - 0.5) * 6, by, br, br * 0.78, 0, 0, Math.PI * 2);
+      gn.fill();
+    }
+    this.nube = new THREE.CanvasTexture(n);
+  }
+
+  // burbuja blanca con un emoji dentro
+  burbuja(emoji) {
+    const S = 128;
+    const c = document.createElement('canvas');
+    c.width = c.height = S;
+    const g = c.getContext('2d');
+    g.fillStyle = 'rgba(255,255,255,.95)';
+    g.beginPath();
+    if (g.roundRect) g.roundRect(8, 8, S - 16, S - 34, 26); else g.rect(8, 8, S - 16, S - 34);
+    g.fill();
+    g.beginPath(); g.moveTo(S / 2 - 12, S - 26); g.lineTo(S / 2 + 4, S - 26); g.lineTo(S / 2 - 4, S - 6); g.closePath(); g.fill();
+    g.font = '58px system-ui, "Apple Color Emoji", "Segoe UI Emoji", sans-serif';
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText(emoji, S / 2, S / 2 - 6);
+    const tex = new THREE.CanvasTexture(c);
+    return tex;
+  }
+}
+/* ============================================================
+   SHADER DE AGUA: olas, reflejo del cielo por Fresnel,
+   brillo del sol, espuma en la orilla y transparencia por fondo
+   ============================================================ */
+const AGUA_VERT = `
+uniform float tiempo;
+uniform float simple;
+attribute float prof;
+varying float vProf;
+varying vec3 vPos;
+varying vec3 vNor;
+varying float vDepth;
+
+void main() {
+  vProf = prof;
+  vec3 p = position;
+  vec3 mundo = (modelMatrix * vec4(p, 1.0)).xyz;
+  float arriba = step(0.5, normal.y);
+
+  float f1 = mundo.x * 0.55 + tiempo * 1.05;
+  float f2 = mundo.z * 0.42 - tiempo * 0.83;
+  float f3 = (mundo.x + mundo.z) * 0.85 + tiempo * 1.7;
+  float extra = 1.0 - simple;
+  float h = (sin(f1) * 0.055 + sin(f2) * 0.045 + sin(f3) * 0.022 * extra) * arriba;
+
+  float dx = cos(f1) * 0.55 * 0.055 + cos(f3) * 0.85 * 0.022 * extra;
+  float dz = cos(f2) * 0.42 * 0.045 + cos(f3) * 0.85 * 0.022 * extra;
+  vec3 nOla = normalize(vec3(-dx, 1.0, -dz));
+  vNor = normalize(mix(normalize(mat3(modelMatrix) * normal), nOla, arriba));
+
+  p.y += h;
+  vec4 mv = modelViewMatrix * vec4(p, 1.0);
+  vDepth = -mv.z;
+  vPos = (modelMatrix * vec4(p, 1.0)).xyz;
+  gl_Position = projectionMatrix * mv;
+}`;
+
+const AGUA_FRAG = `
+uniform vec3 cielo;
+uniform vec3 solDir;
+uniform vec3 solColor;
+uniform vec3 agua;
+uniform vec3 aguaHonda;
+uniform vec3 nieblaColor;
+uniform float nieblaCerca;
+uniform float nieblaLejos;
+uniform float tiempo;
+uniform float luz;
+varying float vProf;
+varying vec3 vPos;
+varying vec3 vNor;
+varying float vDepth;
+
+void main() {
+  vec3 N = normalize(vNor);
+  vec3 V = normalize(cameraPosition - vPos);
+  vec3 L = normalize(solDir);
+
+  float hondo = clamp(vProf / 5.0, 0.0, 1.0);
+  vec3 col = mix(agua, aguaHonda, hondo) * (0.45 + luz * 0.75);
+
+  // reflejo del cielo: más fuerte cuanto más rasante se mira
+  float fres = pow(1.0 - clamp(dot(N, V), 0.0, 1.0), 3.5);
+  col = mix(col, cielo, fres * 0.7);
+
+  // difusa suave y brillo especular del sol
+  col += solColor * max(dot(N, L), 0.0) * 0.10;
+  vec3 H = normalize(L + V);
+  col += solColor * pow(max(dot(N, H), 0.0), 120.0) * 2.0;
+
+  // espuma donde el agua es poco profunda (orilla)
+  float ola = sin(vPos.x * 2.6 + vPos.z * 2.1 + tiempo * 2.3);
+  float espuma = smoothstep(1.05, 0.25, vProf) * (0.5 + 0.5 * ola);
+  col = mix(col, vec3(1.0), clamp(espuma, 0.0, 1.0) * 0.45);
+
+  float alfa = clamp(mix(0.5, 0.9, hondo) + fres * 0.25, 0.0, 1.0);
+
+  float f = clamp((vDepth - nieblaCerca) / max(nieblaLejos - nieblaCerca, 0.001), 0.0, 1.0);
+  col = mix(col, nieblaColor, f);
+  gl_FragColor = vec4(col, alfa);
+}`;
+
+/* ============================================================
+   CHUNK
+   ============================================================ */
+class Chunk {
+  constructor(cx, cz) {
+    this.cx = cx; this.cz = cz;
+    this.data = null;          // Uint8Array
+    this.mesh = null;
+    this.waterMesh = null;
+    this.dirty = true;
+  }
+  get(x, y, z) {
+    if (y < 0 || y >= WORLD_HEIGHT) return AIR;
+    return this.data[IDX(x, y, z)];
+  }
+  set(x, y, z, id) { this.data[IDX(x, y, z)] = id; }
+  dispose(scene) {
+    for (const m of [this.mesh, this.waterMesh]) {
+      if (!m) continue;
+      scene.remove(m);
+      m.geometry.dispose();
+    }
+    this.mesh = this.waterMesh = null;
+    this.dirty = true;
+  }
+}
+
+/* ============================================================
+   MUNDO
+   ============================================================ */
+// Tabla de caras: normal + 4 esquinas en orden antihorario visto desde fuera
+const FACES = [
+  { dir: [ 1, 0, 0], axis: 0, light: 0.80, corners: [[1,0,1],[1,0,0],[1,1,0],[1,1,1]] },
+  { dir: [-1, 0, 0], axis: 0, light: 0.80, corners: [[0,0,0],[0,0,1],[0,1,1],[0,1,0]] },
+  { dir: [ 0, 1, 0], axis: 1, light: 1.00, corners: [[0,1,1],[1,1,1],[1,1,0],[0,1,0]] },
+  { dir: [ 0,-1, 0], axis: 1, light: 0.55, corners: [[0,0,0],[1,0,0],[1,0,1],[0,0,1]] },
+  { dir: [ 0, 0, 1], axis: 2, light: 0.90, corners: [[0,0,1],[1,0,1],[1,1,1],[0,1,1]] },
+  { dir: [ 0, 0,-1], axis: 2, light: 0.90, corners: [[1,0,0],[0,0,0],[0,1,0],[1,1,0]] }
+];
+const CORNER_UV = [[0, 0], [1, 0], [1, 1], [0, 1]];
+const AO_LEVELS = [0.45, 0.66, 0.84, 1.0];
+
+// Desplazamientos de los 3 vecinos que oscurecen cada vértice (precalculado: 0 basura en el bucle)
+const FACE_AO = FACES.map(f => {
+  const t1 = (f.axis + 1) % 3, t2 = (f.axis + 2) % 3;
+  return f.corners.map(c => {
+    const d1 = c[t1] === 1 ? 1 : -1, d2 = c[t2] === 1 ? 1 : -1;
+    const a = [0, 0, 0], b = [0, 0, 0], d = [0, 0, 0];
+    a[t1] = d1; b[t2] = d2; d[t1] = d1; d[t2] = d2;
+    return [a[0], a[1], a[2], b[0], b[1], b[2], d[0], d[1], d[2]];
+  });
+});
+
+const MAX_SOLID_VERTS = 120000, MAX_WATER_VERTS = 32768;
+const PX = CHUNK_SIZE + 2, PY = WORLD_HEIGHT + 2, PZ = CHUNK_SIZE + 2, PXZ = PX * PZ;
+
+class World {
+  constructor(scene, assets, seed) {
+    this.scene = scene;
+    this.assets = assets;
+    this.noise = new Noise(seed);
+    this.seed = seed;
+    this.chunks = new Map();
+    this.arboles = [];            // dónde quedó cada árbol (para colgarles manzanas)
+    this.pad = new Uint8Array(PX * PY * PZ);
+    this.padMaxY = WORLD_HEIGHT - 1;
+    this.ao4 = new Uint8Array(4);
+    this.queue = [];
+    // búferes reutilizables: se llenan al mallar y se copian recortados a la geometría
+    this.sPos = new Float32Array(MAX_SOLID_VERTS * 3);
+    this.sNor = new Float32Array(MAX_SOLID_VERTS * 3);
+    this.sCol = new Float32Array(MAX_SOLID_VERTS * 3);
+    this.sUv  = new Float32Array(MAX_SOLID_VERTS * 2);
+    this.sIdx = new Uint32Array(MAX_SOLID_VERTS * 6);
+    this.wPos = new Float32Array(MAX_WATER_VERTS * 3);
+    this.wNor = new Float32Array(MAX_WATER_VERTS * 3);
+    this.wUv  = new Float32Array(MAX_WATER_VERTS * 2);
+    this.wIdx = new Uint32Array(MAX_WATER_VERTS * 6);
+    this.wProf = new Float32Array(MAX_WATER_VERTS);
+
+    // terreno: especular muy tenue, solo para que el sol se note en las caras
+    this.solidMat = new THREE.MeshPhongMaterial({
+      map: assets.atlas, vertexColors: true,
+      specular: new THREE.Color('#101208'), shininess: 3
+    });
+    this.aguaSimple = new THREE.MeshLambertMaterial({
+      map: assets.waterTex, transparent: true, opacity: 0.72,
+      depthWrite: false, side: THREE.DoubleSide
+    });
+    this.aguaUnif = {
+      tiempo:      { value: 0 },
+      simple:      { value: ES_MOVIL ? 1 : 0 },
+      cielo:       { value: new THREE.Color('#CBE7F3') },
+      solDir:      { value: new THREE.Vector3(0, 1, 0.3) },
+      solColor:    { value: new THREE.Color('#FFF6E4') },
+      agua:        { value: new THREE.Color('#79C2CC') },
+      aguaHonda:   { value: new THREE.Color('#2F6E88') },
+      nieblaColor: { value: new THREE.Color('#CBE7F3') },
+      nieblaCerca: { value: 100 },
+      nieblaLejos: { value: 260 },
+      luz:         { value: 0.7 }
+    };
+    this.aguaShader = new THREE.ShaderMaterial({
+      uniforms: this.aguaUnif,
+      vertexShader: AGUA_VERT,
+      fragmentShader: AGUA_FRAG,
+      transparent: true, depthWrite: false, side: THREE.DoubleSide
+    });
+    this.waterMat = this.aguaShader;
+  }
+
+  /* ---------- generación de terreno ---------- */
+  height(wx, wz) {
+    const c = this.noise.fbm(wx * 0.021, wz * 0.021, 3);              // lomas muy suaves
+    const d = this.noise.fbm(wx * 0.07 + 40, wz * 0.07 - 12, 2);
+    let h = GROUND_Y + c * 4.2 + d * 1.1;
+
+    // isla: el terreno cae al agua en el borde
+    const orilla = sstep(ISLA_R, ISLA_R - 16, Math.hypot(wx, wz));    // 1 dentro, 0 fuera
+    h = (SEA_LEVEL - 4) + (h - (SEA_LEVEL - 4)) * orilla;
+
+    // explanada llana donde va la casa
+    const px = Math.max(0, Math.abs(wx - CASA.x) - PATIO.x);
+    const pz = Math.max(0, Math.abs(wz - CASA.z) - PATIO.z);
+    h = lerp(h, GROUND_Y, sstep(PATIO.suave, 0, Math.hypot(px, pz)));
+
+    return clamp(Math.round(h), 1, WORLD_HEIGHT - 8);
+  }
+
+  enCasa(wx, wz, margen = 0) {
+    return Math.abs(wx - CASA.x) <= CASA.w / 2 + margen && Math.abs(wz - CASA.z) <= CASA.d / 2 + margen;
+  }
+  // camino de piedra: desde la puerta hacia el sur + zócalo alrededor de la casa
+  esCamino(wx, wz) {
+    const z0 = CASA.z + CASA.d / 2;
+    if (Math.abs(wx - CASA.x) <= 1.5 && wz >= z0 - 1 && wz <= z0 + 13) return true;
+    return this.enCasa(wx, wz, 1.3) && !this.enCasa(wx, wz, 0);
+  }
+
+  generateData(chunk) {
+    const data = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE * WORLD_HEIGHT);
+    const ox = chunk.cx * CHUNK_SIZE, oz = chunk.cz * CHUNK_SIZE;
+
+    for (let lz = 0; lz < CHUNK_SIZE; lz++) {
+      for (let lx = 0; lx < CHUNK_SIZE; lx++) {
+        const wx = ox + lx, wz = oz + lz;
+        const h = this.height(wx, wz);
+        const playa = h <= SEA_LEVEL + 1;
+        for (let y = 0; y <= h; y++) {
+          let id;
+          if (y === h) id = playa ? SAND : GRASS;
+          else if (y >= h - 3) id = playa ? SAND : DIRT;
+          else id = STONE;
+          data[IDX(lx, y, lz)] = id;
+        }
+        for (let y = h + 1; y <= SEA_LEVEL; y++) data[IDX(lx, y, lz)] = WATER;
+
+        if (!playa) {
+          if (this.esCamino(wx, wz)) data[IDX(lx, h, lz)] = PATH;
+          else if (!this.enCasa(wx, wz, 1) && hash01(wx, wz, this.seed + 91) < 0.055) data[IDX(lx, h, lz)] = FLOWERS;
+        }
+      }
+    }
+    this.plantTrees(chunk, data);
+    chunk.data = data;
+  }
+
+  // árboles en celdas de 6x6: separación garantizada y continuidad entre chunks
+  plantTrees(chunk, data) {
+    const CELL = 6;
+    const ox = chunk.cx * CHUNK_SIZE, oz = chunk.cz * CHUNK_SIZE;
+    const g0x = Math.floor((ox - 4) / CELL), g1x = Math.floor((ox + CHUNK_SIZE + 4) / CELL);
+    const g0z = Math.floor((oz - 4) / CELL), g1z = Math.floor((oz + CHUNK_SIZE + 4) / CELL);
+
+    const put = (wx, wy, wz, id, soloAire) => {
+      const lx = wx - ox, lz = wz - oz;
+      if (lx < 0 || lx >= CHUNK_SIZE || lz < 0 || lz >= CHUNK_SIZE) return;
+      if (wy < 0 || wy >= WORLD_HEIGHT) return;
+      const i = IDX(lx, wy, lz);
+      if (soloAire && data[i] !== AIR) return;
+      data[i] = id;
+    };
+
+    for (let gz = g0z; gz <= g1z; gz++) {
+      for (let gx = g0x; gx <= g1x; gx++) {
+        if (hash01(gx, gz, this.seed) > 0.34) continue;
+        const tx = gx * CELL + Math.floor(hash01(gx, gz, this.seed + 7) * CELL);
+        const tz = gz * CELL + Math.floor(hash01(gx, gz, this.seed + 13) * CELL);
+        if (this.enCasa(tx, tz, 6)) continue;                       // deja libre el jardín
+        if (Math.hypot(tx, tz) > ISLA_R - 8) continue;              // ni en la orilla
+        const h = this.height(tx, tz);
+        if (h <= SEA_LEVEL + 1) continue;
+        const alto = 4 + Math.floor(hash01(gx, gz, this.seed + 23) * 2);
+
+        // copa redonda
+        for (let dy = alto - 2; dy <= alto + 2; dy++) {
+          const r = (dy === alto - 2 || dy === alto + 1) ? 2 : (dy === alto + 2 ? 1 : 2.4);
+          for (let dz = -3; dz <= 3; dz++) for (let dx = -3; dx <= 3; dx++) {
+            if (Math.hypot(dx, dz) > r) continue;
+            put(tx + dx, h + dy, tz + dz, LEAVES, true);
+          }
+        }
+        for (let dy = 1; dy <= alto; dy++) put(tx, h + dy, tz, WOOD, false);
+        // apuntar el árbol: los de cerca de casa llevarán manzanas
+        if (this.arboles.length < 400) this.arboles.push({ x: tx + 0.5, z: tz + 0.5, y: h, alto: alto });
+      }
+    }
+  }
+
+  /* ---------- acceso a chunks y bloques ---------- */
+  dentro(cx, cz) { return cx >= -WORLD_CHUNKS && cx < WORLD_CHUNKS && cz >= -WORLD_CHUNKS && cz < WORLD_CHUNKS; }
+  getChunk(cx, cz, create) {
+    if (!this.dentro(cx, cz)) return null;
+    const k = key2(cx, cz);
+    let c = this.chunks.get(k);
+    if (!c && create) { c = new Chunk(cx, cz); this.chunks.set(k, c); }
+    if (c && !c.data && create) this.generateData(c);
+    return c;
+  }
+  getData(cx, cz) {
+    const c = this.chunks.get(key2(cx, cz));
+    return c && c.data ? c.data : null;
+  }
+  getBlock(wx, wy, wz) {
+    if (wy < 0 || wy >= WORLD_HEIGHT) return AIR;
+    const cx = Math.floor(wx / CHUNK_SIZE), cz = Math.floor(wz / CHUNK_SIZE);
+    const c = this.getChunk(cx, cz, true);
+    if (!c || !c.data) return AIR;
+    return c.data[IDX(wx - cx * CHUNK_SIZE, wy, wz - cz * CHUNK_SIZE)];
+  }
+  /* ---------- malla ---------- */
+  fillPadded(chunk) {
+    const nb = [];
+    for (let dz = -1; dz <= 1; dz++)
+      for (let dx = -1; dx <= 1; dx++)
+      {
+        const v = this.getChunk(chunk.cx + dx, chunk.cz + dz, true);
+        nb[(dz + 1) * 3 + (dx + 1)] = v ? v.data : null;
+      }
+
+    const pad = this.pad;
+    pad.fill(AIR);
+    let maxY = 0;
+    for (let z = -1; z <= CHUNK_SIZE; z++) {
+      const nz = z < 0 ? 0 : (z >= CHUNK_SIZE ? 2 : 1);
+      const lz = z < 0 ? CHUNK_SIZE - 1 : (z >= CHUNK_SIZE ? 0 : z);
+      for (let x = -1; x <= CHUNK_SIZE; x++) {
+        const nx = x < 0 ? 0 : (x >= CHUNK_SIZE ? 2 : 1);
+        const lx = x < 0 ? CHUNK_SIZE - 1 : (x >= CHUNK_SIZE ? 0 : x);
+        const d = nb[nz * 3 + nx];
+        if (!d) continue;
+        const col = lz * CHUNK_SIZE + lx;
+        const base = (z + 1) * PX + (x + 1);
+        for (let y = 0; y < WORLD_HEIGHT; y++) {
+          const v = d[y * (CHUNK_SIZE * CHUNK_SIZE) + col];
+          if (v === AIR) continue;
+          pad[(y + 1) * PXZ + base] = v;
+          if (y > maxY) maxY = y;
+        }
+      }
+    }
+    this.padMaxY = maxY;
+    return pad;
+  }
+
+  buildMesh(chunk) {
+    const pad = this.fillPadded(chunk);
+    const P = (x, y, z) => pad[(y + 1) * PXZ + (z + 1) * PX + (x + 1)];
+
+    const sp = this.sPos, sn = this.sNor, su = this.sUv, scl = this.sCol, sidx = this.sIdx;
+    const wp = this.wPos, wn = this.wNor, wu = this.wUv, widx = this.wIdx, wpr = this.wProf;
+    const ao = this.ao4;
+    let vc = 0, ic = 0, wvc = 0, wic = 0;                       // contadores de vértices e índices
+    const top = Math.min(this.padMaxY + 1, WORLD_HEIGHT - 1);   // no recorrer el cielo vacío
+
+    for (let y = 0; y <= top; y++) {
+      for (let z = 0; z < CHUNK_SIZE; z++) {
+        for (let x = 0; x < CHUNK_SIZE; x++) {
+          const id = P(x, y, z);
+          if (id === AIR) continue;
+
+          /* --- agua: geometría aparte, cara solo contra aire --- */
+          if (id === WATER) {
+            const topY = P(x, y + 1, z) === WATER ? 1 : 0.9;
+            // profundidad de la columna de agua: la usa el shader para el color y la espuma
+            let prof = 1;
+            for (let k = y - 1; k >= 0 && P(x, k, z) === WATER; k--) prof++;
+            for (let fi = 0; fi < 6; fi++) {
+              const f = FACES[fi];
+              if (P(x + f.dir[0], y + f.dir[1], z + f.dir[2]) !== AIR) continue;
+              if (wvc + 4 > MAX_WATER_VERTS) continue;
+              const base = wvc;
+              for (let v = 0; v < 4; v++) {
+                const c = f.corners[v], o3 = wvc * 3, o2 = wvc * 2;
+                wp[o3] = x + c[0]; wp[o3 + 1] = y + (c[1] === 1 ? topY : 0); wp[o3 + 2] = z + c[2];
+                wn[o3] = f.dir[0]; wn[o3 + 1] = f.dir[1]; wn[o3 + 2] = f.dir[2];
+                wu[o2] = CORNER_UV[v][0]; wu[o2 + 1] = CORNER_UV[v][1];
+                wpr[wvc] = prof;
+                wvc++;
+              }
+              widx[wic++] = base; widx[wic++] = base + 1; widx[wic++] = base + 2;
+              widx[wic++] = base; widx[wic++] = base + 2; widx[wic++] = base + 3;
+            }
+            continue;
+          }
+
+          /* --- bloques sólidos: solo las caras expuestas --- */
+          const info = BLOCKS[id];
+          for (let fi = 0; fi < 6; fi++) {
+            const f = FACES[fi];
+            const px = x + f.dir[0], py = y + f.dir[1], pz = z + f.dir[2];
+            if (isOpaque(P(px, py, pz))) continue;              // culling de caras ocultas
+            if (vc + 4 > MAX_SOLID_VERTS) continue;
+
+            const r = this.assets.uv(f.axis === 1 ? (f.dir[1] === 1 ? info.top : info.bottom) : info.side);
+            const aoTable = FACE_AO[fi];
+            const base = vc;
+
+            for (let v = 0; v < 4; v++) {
+              const c = f.corners[v], o3 = vc * 3, o2 = vc * 2;
+              sp[o3] = x + c[0]; sp[o3 + 1] = y + c[1]; sp[o3 + 2] = z + c[2];
+              sn[o3] = f.dir[0]; sn[o3 + 1] = f.dir[1]; sn[o3 + 2] = f.dir[2];
+              su[o2] = CORNER_UV[v][0] ? r.u1 : r.u0;
+              su[o2 + 1] = CORNER_UV[v][1] ? r.v1 : r.v0;
+
+              // oclusión ambiental: los 2 lados + la esquina diagonal
+              const o = aoTable[v];
+              const s1 = isOpaque(P(px + o[0], py + o[1], pz + o[2])) ? 1 : 0;
+              const s2 = isOpaque(P(px + o[3], py + o[4], pz + o[5])) ? 1 : 0;
+              const sc = isOpaque(P(px + o[6], py + o[7], pz + o[8])) ? 1 : 0;
+              const level = (s1 && s2) ? 0 : 3 - (s1 + s2 + sc);
+              ao[v] = level;
+              const shade = AO_LEVELS[level] * f.light;
+              scl[o3] = shade; scl[o3 + 1] = shade; scl[o3 + 2] = shade;
+              vc++;
+            }
+
+            // voltear la diagonal del quad para que la sombra no se vea torcida
+            if (ao[0] + ao[2] > ao[1] + ao[3]) {
+              sidx[ic++] = base; sidx[ic++] = base + 1; sidx[ic++] = base + 2;
+              sidx[ic++] = base; sidx[ic++] = base + 2; sidx[ic++] = base + 3;
+            } else {
+              sidx[ic++] = base + 1; sidx[ic++] = base + 2; sidx[ic++] = base + 3;
+              sidx[ic++] = base + 1; sidx[ic++] = base + 3; sidx[ic++] = base;
+            }
+          }
+        }
+      }
+    }
+
+    if (chunk.mesh) { this.scene.remove(chunk.mesh); chunk.mesh.geometry.dispose(); chunk.mesh = null; }
+    if (chunk.waterMesh) { this.scene.remove(chunk.waterMesh); chunk.waterMesh.geometry.dispose(); chunk.waterMesh = null; }
+
+    const ox = chunk.cx * CHUNK_SIZE, oz = chunk.cz * CHUNK_SIZE;
+
+    if (ic) {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.BufferAttribute(sp.slice(0, vc * 3), 3));
+      g.setAttribute('normal', new THREE.BufferAttribute(sn.slice(0, vc * 3), 3));
+      g.setAttribute('uv', new THREE.BufferAttribute(su.slice(0, vc * 2), 2));
+      g.setAttribute('color', new THREE.BufferAttribute(scl.slice(0, vc * 3), 3));
+      g.setIndex(new THREE.BufferAttribute(sidx.slice(0, ic), 1));
+      g.computeBoundingSphere();
+      const m = new THREE.Mesh(g, this.solidMat);
+      m.position.set(ox, 0, oz);
+      m.castShadow = true; m.receiveShadow = true;
+      m.matrixAutoUpdate = false; m.updateMatrix();
+      this.scene.add(m);
+      chunk.mesh = m;
+    }
+    if (wic) {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.BufferAttribute(wp.slice(0, wvc * 3), 3));
+      g.setAttribute('normal', new THREE.BufferAttribute(wn.slice(0, wvc * 3), 3));
+      g.setAttribute('uv', new THREE.BufferAttribute(wu.slice(0, wvc * 2), 2));
+      g.setAttribute('prof', new THREE.BufferAttribute(this.wProf.slice(0, wvc), 1));
+      g.setIndex(new THREE.BufferAttribute(widx.slice(0, wic), 1));
+      g.computeBoundingSphere();
+      const m = new THREE.Mesh(g, this.waterMat);
+      m.position.set(ox, 0, oz);
+      m.renderOrder = 1;
+      m.matrixAutoUpdate = false; m.updateMatrix();
+      this.scene.add(m);
+      chunk.waterMesh = m;
+    }
+    chunk.dirty = false;
+  }
+
+  /* ---------- construcción de la isla (progresiva, sin tirones) ---------- */
+  prepare() {
+    this.cola = [];
+    for (let cz = -WORLD_CHUNKS; cz < WORLD_CHUNKS; cz++)
+      for (let cx = -WORLD_CHUNKS; cx < WORLD_CHUNKS; cx++) {
+        const c = new Chunk(cx, cz);
+        this.chunks.set(key2(cx, cz), c);
+        this.cola.push(c);
+      }
+    this.cola.sort((a, b) => (a.cx * a.cx + a.cz * a.cz) - (b.cx * b.cx + b.cz * b.cz));
+    this.total = this.cola.length;
+  }
+  stream(ms) {
+    const t0 = performance.now();
+    while (this.cola.length && performance.now() - t0 < ms) {
+      const c = this.cola.shift();
+      if (!c.data) this.generateData(c);
+      this.buildMesh(c);
+    }
+    return this.cola.length;
+  }
+  // el shader necesita saber del cielo, del sol y de la niebla
+  actualizarAgua(t, amb) {
+    const u = this.aguaUnif;
+    u.tiempo.value = t;
+    u.cielo.value.copy(amb.cielo);
+    if (amb.dirLuz) u.solDir.value.copy(amb.dirLuz);
+    u.solColor.value.copy(amb.sol.color);
+    u.luz.value = clamp(amb.hemi.intensity + amb.sol.intensity, 0.12, 1.6);
+    const f = this.scene.fog;
+    if (f) { u.nieblaColor.value.copy(f.color); u.nieblaCerca.value = f.near; u.nieblaLejos.value = f.far; }
+  }
+  usarShaderAgua(si) {
+    this.waterMat = si ? this.aguaShader : this.aguaSimple;
+    for (const [, c] of this.chunks) if (c.waterMesh) c.waterMesh.material = this.waterMat;
+    return si;
+  }
+
+  // altura de la superficie caminable (primer bloque sólido desde arriba)
+  superficie(wx, wz) {
+    for (let y = WORLD_HEIGHT - 1; y >= 0; y--) {
+      const b = this.getBlock(wx, y, wz);
+      if (isSolid(b)) return y + 1;
+    }
+    return 0;
+  }
+
+  /* ---------- raycast por voxels (DDA) ---------- */
+  raycast(origin, dir, maxDist) {
+    let x = Math.floor(origin.x), y = Math.floor(origin.y), z = Math.floor(origin.z);
+    const sx = Math.sign(dir.x), sy = Math.sign(dir.y), sz = Math.sign(dir.z);
+    const dx = sx !== 0 ? Math.abs(1 / dir.x) : Infinity;
+    const dy = sy !== 0 ? Math.abs(1 / dir.y) : Infinity;
+    const dz = sz !== 0 ? Math.abs(1 / dir.z) : Infinity;
+    let tx = sx === 0 ? Infinity : (sx > 0 ? (x + 1 - origin.x) : (origin.x - x)) * dx;
+    let ty = sy === 0 ? Infinity : (sy > 0 ? (y + 1 - origin.y) : (origin.y - y)) * dy;
+    let tz = sz === 0 ? Infinity : (sz > 0 ? (z + 1 - origin.z) : (origin.z - z)) * dz;
+
+    let nx = 0, ny = 1, nz = 0, t = 0;
+    for (let i = 0; i < 900; i++) {
+      const id = this.getBlock(x, y, z);
+      if (isSolid(id)) return { x, y, z, nx, ny, nz, id };
+      if (t > maxDist) break;
+      if (tx < ty && tx < tz) { x += sx; t = tx; tx += dx; nx = -sx; ny = 0; nz = 0; }
+      else if (ty < tz)       { y += sy; t = ty; ty += dy; nx = 0; ny = -sy; nz = 0; }
+      else                    { z += sz; t = tz; tz += dz; nx = 0; ny = 0; nz = -sz; }
+    }
+    return null;
+  }
+}
+
+
+/* ============================================================
+   LA CASA: muros con huecos, techo que se quita y muebles
+   ============================================================ */
+const PISO = GROUND_Y + 1 + 0.06;          // altura del suelo interior
+const ALTO_TEJADO = GROUND_Y + 1 + 0.06 + 6.2;   // cumbrera: ahí se posa la ptera
+
+const COLOR = {
+  muro:'#F6E9D2', muroInt:'#FBF3E3', zocalo:'#E3D0AE', techo:'#DE9A78', techoBorde:'#C9805F',
+  maderaC:'#D6AC7E', maderaM:'#B4835A', crema:'#FBF3E3', rosa:'#EFB0AA', salvia:'#9DBF95',
+  salviaOsc:'#87A97F', mostaza:'#F2D9A7', piedra:'#C9BBA6', gris:'#8A8078', tinta:'#4C4238',
+  hoja:'#8FBE86', maceta:'#E2916B', pantalla:'#38484F', vidrio:'#CBE7F3', luzCalida:'#FFE3A8'
+};
+
+const matCache = new Map();
+// Phong en vez de Lambert: la luz se calcula por píxel y admite brillo especular
+function mat(color, opts) {
+  const o = Object.assign({}, opts || {});
+  const k = color + JSON.stringify(o);
+  if (matCache.has(k)) return matCache.get(k);
+  const brillo = o.brillo || '#101013', dureza = o.dureza || 8;
+  delete o.brillo; delete o.dureza;
+  const m = new THREE.MeshPhongMaterial(Object.assign({
+    color: new THREE.Color(color),
+    specular: new THREE.Color(brillo),
+    shininess: dureza
+  }, o));
+  matCache.set(k, m);
+  return m;
+}
+function caja(w, h, d, color, x, y, z, opts) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(color, opts));
+  m.position.set(x, y, z);
+  m.castShadow = true; m.receiveShadow = true;
+  return m;
+}
+function cilindro(r, h, color, x, y, z, seg) {
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, seg || 12), mat(color));
+  m.position.set(x, y, z);
+  m.castShadow = true; m.receiveShadow = true;
+  return m;
+}
+function esfera(r, color, x, y, z) {
+  const m = new THREE.Mesh(new THREE.SphereGeometry(r, 10, 8), mat(color));
+  m.position.set(x, y, z);
+  m.castShadow = true; m.receiveShadow = true;
+  return m;
+}
+
+/* --- caras de una caja: origen + dos vectores en el plano (sentido antihorario desde fuera) --- */
+const CARAS = [
+  { n:[0, 1, 0], o:[0,1,1], u:[1,0,0],  v:[0,0,-1], luz:1.00 },
+  { n:[0,-1, 0], o:[0,0,0], u:[1,0,0],  v:[0,0, 1], luz:0.58 },
+  { n:[0, 0, 1], o:[0,0,1], u:[1,0,0],  v:[0,1, 0], luz:0.90 },
+  { n:[0, 0,-1], o:[1,0,0], u:[-1,0,0], v:[0,1, 0], luz:0.90 },
+  { n:[1, 0, 0], o:[1,0,1], u:[0,0,-1], v:[0,1, 0], luz:0.80 },
+  { n:[-1,0, 0], o:[0,0,0], u:[0,0,1],  v:[0,1, 0], luz:0.80 }
+];
+
+// tiles del atlas que usa la casa (los mismos que el terreno)
+const T = { yeso:11, teja:12, duela:13, tabla:14, tela:15, liso:16, hojas:8 };
+const TINTE = {
+  muro:'#EFE0C4', zocalo:'#D8C29C', techo:'#D4886A', alero:'#B9704F',
+  duela:'#D3AA7B', maderaC:'#C89E72', maderaM:'#A2764F',
+  salvia:'#8FB287', salviaOsc:'#7A9A73', rosa:'#E29E98', crema:'#EFE3CE', mostaza:'#E5C892',
+  piedra:'#B9AB96', metal:'#867C74', maceta:'#D28062', hoja:'#FFFFFF', tinta:'#4C4238'
+};
+
+/* Construye geometría con el mismo atlas pixelado del terreno.
+   Cada cara se parte en cuadros de "escala" unidades para que la textura
+   tenga siempre la misma densidad de píxeles que los bloques. */
+class Constructor {
+  constructor(assets) {
+    this.a = assets;
+    this.pos = []; this.nor = []; this.uvs = []; this.col = []; this.idx = [];
+  }
+  caja(cx, cy, cz, w, h, d, tiles, tinte, escala) {
+    const e = escala || 1;
+    const t = typeof tiles === 'number' ? { t: tiles, s: tiles, b: tiles } : tiles;
+    const c = new THREE.Color(tinte || '#FFFFFF');
+    const min = [cx - w / 2, cy - h / 2, cz - d / 2];
+    for (const f of CARAS) {
+      const tile = f.n[1] === 1 ? t.t : (f.n[1] === -1 ? (t.b === undefined ? t.s : t.b) : t.s);
+      const r = this.a.uv(tile);
+      const o = [min[0] + f.o[0] * w, min[1] + f.o[1] * h, min[2] + f.o[2] * d];
+      const su = Math.abs(f.u[0]) * w + Math.abs(f.u[1]) * h + Math.abs(f.u[2]) * d;
+      const sv = Math.abs(f.v[0]) * w + Math.abs(f.v[1]) * h + Math.abs(f.v[2]) * d;
+      const nu = Math.max(1, Math.ceil(su / e - 1e-6)), nv = Math.max(1, Math.ceil(sv / e - 1e-6));
+      for (let i = 0; i < nu; i++) {
+        const a0 = i * e, a1 = Math.min(su, (i + 1) * e), fu = (a1 - a0) / e;
+        for (let j = 0; j < nv; j++) {
+          const b0 = j * e, b1 = Math.min(sv, (j + 1) * e), fv = (b1 - b0) / e;
+          const base = this.pos.length / 3;
+          const esq = [[a0, b0], [a1, b0], [a1, b1], [a0, b1]];
+          const uv = [[0, 0], [fu, 0], [fu, fv], [0, fv]];
+          for (let k = 0; k < 4; k++) {
+            const a = esq[k][0], b = esq[k][1];
+            this.pos.push(o[0] + f.u[0] * a + f.v[0] * b,
+                          o[1] + f.u[1] * a + f.v[1] * b,
+                          o[2] + f.u[2] * a + f.v[2] * b);
+            this.nor.push(f.n[0], f.n[1], f.n[2]);
+            this.uvs.push(lerp(r.u0, r.u1, uv[k][0]), lerp(r.v0, r.v1, uv[k][1]));
+            this.col.push(c.r * f.luz, c.g * f.luz, c.b * f.luz);
+          }
+          this.idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
+        }
+      }
+    }
+    return this;
+  }
+  malla(material) {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(this.pos, 3));
+    g.setAttribute('normal', new THREE.Float32BufferAttribute(this.nor, 3));
+    g.setAttribute('uv', new THREE.Float32BufferAttribute(this.uvs, 2));
+    g.setAttribute('color', new THREE.Float32BufferAttribute(this.col, 3));
+    g.setIndex(this.idx);
+    g.computeBoundingSphere();
+    const m = new THREE.Mesh(g, material);
+    m.castShadow = true; m.receiveShadow = true;
+    return m;
+  }
+}
+
+class Mueble {
+  constructor(cfg) {
+    Object.assign(this, cfg);
+    this.grupo = new THREE.Group();
+    this.grupo.userData.mueble = this;
+  }
+}
+
+class Casa {
+  constructor(scene, assets) {
+    this.scene = scene;
+    this.assets = assets;
+    this.grupo = new THREE.Group();
+    this.muebles = [];
+    this.ventanas = [];
+    this.luces = [];
+    this.muros = [];
+    this.techoVisible = 1;
+    this.techoManual = null;
+    scene.add(this.grupo);
+    this.build();
+  }
+
+  material(extra) {
+    return new THREE.MeshPhongMaterial(Object.assign({
+      map: this.assets.atlas, vertexColors: true, transparent: true,
+      specular: new THREE.Color('#17171a'), shininess: 14
+    }, extra || {}));
+  }
+  nuevo() { return new Constructor(this.assets); }
+
+  get bordes() {
+    return { x0: CASA.x - CASA.w / 2, x1: CASA.x + CASA.w / 2, z0: CASA.z - CASA.d / 2, z1: CASA.z + CASA.d / 2 };
+  }
+  dentro(x, z, m = 0) {
+    const b = this.bordes;
+    return x > b.x0 - m && x < b.x1 + m && z > b.z0 - m && z < b.z1 + m;
+  }
+  // mueble cuyo hueco cae cerca del punto tocado (con dedo hace falta margen)
+  muebleCerca(x, z, m) {
+    for (const mu of this.muebles) {
+      const r = mu.rect;
+      if (x > r[0] - m && x < r[2] + m && z > r[1] - m && z < r[3] + m) return mu;
+    }
+    return null;
+  }
+
+  build() {
+    const b = this.bordes, alto = CASA.alto, gr = CASA.muro;
+
+    /* ---- piso de duela ---- */
+    const piso = this.nuevo()
+      .caja(CASA.x, PISO - 0.11, CASA.z, CASA.w + 0.7, 0.22, CASA.d + 0.7, T.duela, TINTE.duela)
+      .malla(this.material());
+    piso.castShadow = false;
+    this.grupo.add(piso);
+
+    /* ---- muros ---- */
+    const H_PUERTA = 2.35, V0 = 1.15, V1 = 2.35;
+    this.muro('S', b.x0, b.x1, b.z1, true, alto, gr, [{ a: 6.0, b: 9.0, y0: 0, y1: H_PUERTA, puerta: true }]);
+    this.muro('N', b.x0, b.x1, b.z0, true, alto, gr, [{ a: 2.5, b: 4.5, y0: V0, y1: V1 }, { a: 10.5, b: 12.5, y0: V0, y1: V1 }]);
+    this.muro('O', b.z0, b.z1, b.x0, false, alto, gr, [{ a: 3.5, b: 6.0, y0: V0, y1: V1 }]);
+    this.muro('E', b.z0, b.z1, b.x1, false, alto, gr, [{ a: 1.4, b: 3.4, y0: V0, y1: V1 }]);
+
+    /* ---- techo escalonado de tejas ---- */
+    const t = this.nuevo();
+    t.caja(CASA.x, PISO + alto + 0.12, CASA.z, CASA.w + 2.0, 0.24, CASA.d + 2.0, T.tabla, TINTE.alero);
+    const capas = 7, hc = 0.34;
+    for (let i = 0; i < capas; i++) {
+      const f = i / capas;
+      t.caja(CASA.x, PISO + alto + 0.36 + i * hc, CASA.z,
+        (CASA.w + 1.7) * (1 - f * 0.9), hc + 0.02, (CASA.d + 1.7) * (1 - f * 0.9), T.teja, TINTE.techo);
+    }
+    t.caja(CASA.x, PISO + alto + 0.36 + capas * hc, CASA.z, 2.2, 0.3, 1.4, T.teja, TINTE.alero);
+    this.techo = t.malla(this.material());
+    this.grupo.add(this.techo);
+
+    /* ---- chimenea (con su humo, que sale del juego) ---- */
+    const chX = CASA.x - 6.4, chZ = CASA.z + 0.3;   // encima del hogar de dentro
+    const chBase = PISO + alto + 0.3, chAlto = 3.5;   // que asome bien por encima del tejado
+    const ch = this.nuevo();
+    ch.caja(chX, chBase + chAlto / 2, chZ, 1.25, chAlto, 1.25, T.liso, TINTE.piedra, 0.5);
+    ch.caja(chX, chBase + chAlto + 0.14, chZ, 1.55, 0.28, 1.55, T.liso, '#A2937E', 0.5);
+    const chimenea = ch.malla(this.material());
+    chimenea.castShadow = true;
+    this.grupo.add(chimenea);
+    this.chimenea = new THREE.Vector3(chX, chBase + chAlto + 0.4, chZ);
+
+    /* ---- puerta abierta apoyada en el muro y felpudo ---- */
+    const extra = this.nuevo();
+    extra.caja(CASA.x + 2.35, PISO + 1.18, b.z1 + 0.26, 1.5, 2.3, 0.12, T.tabla, TINTE.maderaC, 0.5);
+    extra.caja(CASA.x + 1.72, PISO + 1.18, b.z1 + 0.34, 0.1, 0.1, 0.1, T.liso, TINTE.metal, 0.4);
+    extra.caja(CASA.x, PISO + 0.03, b.z1 + 1.1, 1.9, 0.06, 1.0, T.tela, '#B99C74', 0.5);
+    this.grupo.add(extra.malla(this.material()));
+
+    /* ---- muebles ---- */
+    this.cama(); this.cocina(); this.sofa(); this.tele(); this.mesa();
+    this.planta(-6.8, 4.4); this.planta(6.5, -0.7);
+    this.lampara(1.0, 0.0);
+    this.alfombra(4.6, 2.2, 4.4, 3.4, TINTE.rosa);
+    this.alfombra(-2.6, 3.2, 3.6, 2.8, TINTE.mostaza);
+
+    this.hogar();
+    this.huerto();
+
+    for (const m of this.muebles) this.grupo.add(m.grupo);
+  }
+
+  /* ---------------- el hogar, justo debajo de la chimenea ---------------- */
+  hogar() {
+    const x = CASA.x - 6.4, z = CASA.z + 0.3;     // hueco libre del muro oeste
+    const m = new Mueble({
+      nombre: 'Hogar', emoji: '🔥', accion: 'calentándose', verbo: 'Calentarse',
+      need: 'energia', tasa: 6, need2: 'diversion', tasa2: 5,
+      x, z, anclaX: x + 2.0, anclaZ: z, mirar: -Math.PI / 2, pose: 'sentado',
+      rect: [x - 1.2, z - 1.1, x + 1.2, z + 1.1]
+    });
+    // OJO: aquí NO se usa el material del atlas (transparent:true). Pegado al muro, ese
+    // material se pierde entre las paredes que se recortan; con cajas opacas se ve siempre.
+    const piedra = (w, h, d, col, px, py, pz) => {
+      const b = caja(w, h, d, col, px, py, pz);
+      b.material = new THREE.MeshPhongMaterial({
+        color: new THREE.Color(col), specular: new THREE.Color('#221e19'), shininess: 6
+      });
+      b.castShadow = true;
+      m.grupo.add(b);
+      return b;
+    };
+    // el hueco tiene que ser HUECO: fondo, dos jambas y dintel (una caja maciza dentro se
+    // comía el fuego)
+    piedra(0.55, 1.24, 1.9, TINTE.piedra, x - 0.72, PISO + 0.62, z);     // fondo
+    piedra(1.0, 1.24, 0.34, TINTE.piedra, x + 0.05, PISO + 0.62, z - 0.78);
+    piedra(1.0, 1.24, 0.34, TINTE.piedra, x + 0.05, PISO + 0.62, z + 0.78);
+    piedra(1.5, 0.26, 2.0, '#A2937E', x - 0.1, PISO + 1.34, z);          // dintel
+    piedra(1.5, 0.14, 1.7, '#3B2F26', x - 0.1, PISO + 0.06, z);          // solera
+    piedra(0.7, 0.2, 0.22, TINTE.maderaM, x - 0.1, PISO + 0.24, z - 0.12);
+    piedra(0.7, 0.2, 0.22, '#8A6440', x - 0.1, PISO + 0.24, z + 0.16);
+
+    // llamas: tres cubos naranjas que suben y bajan solos
+    this.llamas = [];
+    for (let i = 0; i < 3; i++) {
+      const f = caja(0.34 - i * 0.07, 0.4 + i * 0.1, 0.3 - i * 0.06, ['#F2A03C', '#EC6F3A', '#F7C64F'][i],
+        x - 0.1 + (i - 1) * 0.06, PISO + 0.42 + i * 0.12, z + (i - 1) * 0.26);
+      f.material = new THREE.MeshPhongMaterial({
+        color: new THREE.Color(['#F2A03C', '#EC6F3A', '#F7C64F'][i]),
+        emissive: new THREE.Color('#C4571F'), transparent: true, opacity: 0.92
+      });
+      f.castShadow = false;
+      m.grupo.add(f);
+      this.llamas.push({ malla: f, base: PISO + 0.42 + i * 0.12, f: 5 + i * 2.3, p: i * 2.1 });
+    }
+    this.luzFuego = new THREE.PointLight(0xFF9A4A, 1.5, 11, 2);
+    this.luzFuego.position.set(x + 0.3, PISO + 0.7, z);
+    m.grupo.add(this.luzFuego);
+
+    this.muebles.push(m);
+  }
+
+  /* ---------------- huerto: seis parcelas junto al patio ----------------
+     Son "muebles" como los de dentro, así el clic de siempre ya los encuentra;
+     lo que cambia es que en vez de usarse se plantan, se riegan y se cosechan. */
+  huerto() {
+    const bx = PATIO.x - 2.0, bz = PATIO.z - 1.0;   // esquina del bancal
+    const paso = 2.3, filas = 2, cols = 3;
+    this.parcelas = [];
+    for (let f = 0; f < filas; f++) {
+      for (let c = 0; c < cols; c++) {
+        const x = bx + c * paso, z = bz + f * paso;
+        const m = new Mueble({
+          nombre: 'Huerto', emoji: '🌱', accion: 'en el huerto', verbo: 'Ir al huerto',
+          tipo: 'huerto', x, z,
+          anclaX: x, anclaZ: z + 1.35, mirar: Math.PI,
+          rect: [x - 1.05, z - 1.05, x + 1.05, z + 1.05],
+          estado: 0,          // 0 tierra, 1 brote, 2 mata, 3 maduro
+          crece: 0,           // 0..1 dentro de la etapa
+          regada: 0           // segundos de riego que le quedan
+        });
+
+        // la tierra labrada, siempre visible
+        const t = this.nuevo();
+        t.caja(x, PISO + 0.06, z, 2.0, 0.16, 2.0, T.liso, '#8A6A4C', 0.4);
+        t.caja(x, PISO + 0.15, z, 1.7, 0.05, 1.7, T.liso, '#75573D', 0.35);
+        m.grupo.add(t.malla(this.material()));
+
+        // tres etapas de planta, se encienden y apagan según crece
+        m.etapas = [];
+        const hojas = ['#7FB069', '#6FA05C', '#5F9150'];
+        for (let e = 0; e < 3; e++) {
+          const g = new THREE.Group();
+          for (const [ox, oz] of [[-0.5, -0.45], [0.5, -0.4], [0, 0.5]]) {
+            const p = this.nuevo();
+            const h = 0.22 + e * 0.30;
+            p.caja(x + ox, PISO + 0.16 + h / 2, z + oz, 0.1, h, 0.1, T.liso, '#6B8E4E', 0.25);
+            const r = 0.26 + e * 0.16;
+            p.caja(x + ox, PISO + 0.16 + h, z + oz, r, 0.16 + e * 0.08, r, T.hojas, hojas[e], 0.3);
+            if (e === 2) {   // maduro: el tomate
+              p.caja(x + ox, PISO + 0.20 + h, z + oz + 0.16, 0.24, 0.24, 0.24, T.liso, '#D9584B', 0.2);
+            }
+            g.add(p.malla(this.material()));
+          }
+          g.visible = false;
+          m.grupo.add(g);
+          m.etapas.push(g);
+        }
+        this.muebles.push(m);
+        this.parcelas.push(m);
+      }
+    }
+  }
+
+  /* ---------------- muelle de pesca en la orilla ----------------
+     Se busca hacia dónde queda el agua más cerca y se tiende una pasarela. */
+  muelle(world) {
+    let mejor = null;
+    for (let a = 0; a < 64; a++) {
+      const ang = a / 64 * Math.PI * 2;
+      const dx = Math.cos(ang), dz = Math.sin(ang);
+      for (let r = 12; r < ISLA_R + 6; r += 1) {
+        const x = CASA.x + dx * r, z = CASA.z + dz * r;
+        if (world.height(Math.floor(x), Math.floor(z)) <= SEA_LEVEL) {
+          if (!mejor || r < mejor.r) mejor = { r, x, z, dx, dz };
+          break;
+        }
+      }
+    }
+    if (!mejor) return;
+    // la pasarela arranca en tierra firme y se mete 5 pasos en el agua
+    const x0 = CASA.x + mejor.dx * (mejor.r - 1.5), z0 = CASA.z + mejor.dz * (mejor.r - 1.5);
+    const c = this.nuevo();
+    const largo = 7, y = SEA_LEVEL + 1.35;
+    for (let i = 0; i < largo; i++) {
+      const px = x0 + mejor.dx * i * 1.2, pz = z0 + mejor.dz * i * 1.2;
+      c.caja(px, y, pz, 2.0, 0.18, 2.0, T.tabla, TINTE.maderaC, 0.5);
+      if (i % 2 === 0) {
+        c.caja(px, y - 0.9, pz, 0.22, 1.7, 0.22, T.tabla, TINTE.maderaM, 0.3);
+      }
+    }
+    const fx = x0 + mejor.dx * (largo - 1) * 1.2, fz = z0 + mejor.dz * (largo - 1) * 1.2;
+    // farolillo al final, para que se vea de noche
+    c.caja(fx - mejor.dz * 0.7, y + 0.75, fz + mejor.dx * 0.7, 0.16, 1.5, 0.16, T.tabla, TINTE.maderaM, 0.3);
+    this.grupo.add(c.malla(this.material()));
+
+    const farol = caja(0.42, 0.42, 0.42, COLOR.luzCalida, fx - mejor.dz * 0.7, y + 1.6, fz + mejor.dx * 0.7);
+    farol.material = new THREE.MeshPhongMaterial({ color: new THREE.Color(COLOR.luzCalida) });
+    this.grupo.add(farol);
+    this.farolMuelle = farol;
+    const luzM = new THREE.PointLight(0xFFD9A0, 0, 12, 2);
+    luzM.position.set(fx - mejor.dz * 0.7, y + 1.6, fz + mejor.dx * 0.7);
+    this.grupo.add(luzM);
+    this.luces.push(luzM);
+
+    const m = new Mueble({
+      nombre: 'Pesca', emoji: '🎣', accion: 'pescando', verbo: 'Pescar',
+      tipo: 'pesca', x: fx, z: fz,
+      anclaX: fx - mejor.dx * 0.6, anclaZ: fz - mejor.dz * 0.6,
+      mirar: Math.atan2(mejor.dx, mejor.dz),
+      rect: [fx - 1.4, fz - 1.4, fx + 1.4, fz + 1.4],
+      dirX: mejor.dx, dirZ: mejor.dz
+    });
+    // el corcho, que flota y se hunde cuando pica
+    const corcho = caja(0.22, 0.22, 0.22, '#E9584C', fx + mejor.dx * 2.6, SEA_LEVEL + 1.02, fz + mejor.dz * 2.6);
+    corcho.material = new THREE.MeshPhongMaterial({ color: new THREE.Color('#E9584C') });
+    corcho.visible = false;
+    m.corcho = corcho;
+    m.grupo.add(corcho);
+    this.muebles.push(m);
+    this.pescadero = m;
+    this.grupo.add(m.grupo);
+  }
+
+  /* ---------------- manzanos: unos cuantos árboles con fruta ---------------- */
+  manzanos(world) {
+    this.arboles = [];
+    const cerca = world.arboles
+      .filter(a => Math.hypot(a.x - CASA.x, a.z - CASA.z) < 30)
+      .sort((p, q) => Math.hypot(p.x, p.z) - Math.hypot(q.x, q.z))
+      .slice(0, 7);
+    for (const a of cerca) {
+      const yc = a.y + a.alto - 0.6;       // a la altura de la copa
+      const m = new Mueble({
+        nombre: 'Manzano', emoji: '🍎', accion: 'cogiendo manzanas', verbo: 'Coger una manzana',
+        tipo: 'manzano', x: a.x, z: a.z,
+        anclaX: a.x, anclaZ: a.z + 2.1, mirar: Math.PI,
+        rect: [a.x - 1.8, a.z - 1.8, a.x + 1.8, a.z + 1.8],
+        maduro: true, espera: 0
+      });
+      const g = new THREE.Group();
+      const rnd = mulberry32(Math.floor(a.x * 71 + a.z * 131) + 5);
+      for (let i = 0; i < 5; i++) {
+        const ang = rnd() * Math.PI * 2, r = 1.1 + rnd() * 0.9;
+        const p = this.nuevo();
+        p.caja(a.x + Math.cos(ang) * r, yc + (rnd() - 0.5) * 1.2, a.z + Math.sin(ang) * r,
+          0.34, 0.34, 0.34, T.liso, '#D94F45', 0.22);
+        g.add(p.malla(this.material()));
+      }
+      m.frutas = g;
+      m.grupo.add(g);
+      this.muebles.push(m);
+      this.arboles.push(m);
+      this.grupo.add(m.grupo);
+    }
+  }
+
+  muro(id, a0, a1, fijo, ejeX, alto, gr, huecos) {
+    const largo = a1 - a0;
+    const piezas = [];
+    let cursor = 0;
+    for (const h of huecos.sort((p, q) => p.a - q.a)) {
+      if (h.a > cursor) piezas.push({ a: cursor, b: h.a, y0: 0, y1: alto });
+      if (h.y0 > 0) piezas.push({ a: h.a, b: h.b, y0: 0, y1: h.y0 });
+      if (h.y1 < alto) piezas.push({ a: h.a, b: h.b, y0: h.y1, y1: alto });
+      cursor = h.b;
+    }
+    if (cursor < largo) piezas.push({ a: cursor, b: largo, y0: 0, y1: alto });
+
+    const g = new THREE.Group();
+    const c = this.nuevo();
+    const poner = (len, altura, centro, y, grosor, tile, tinte, esc) => {
+      if (ejeX) c.caja(centro, y, fijo, len, altura, grosor, tile, tinte, esc);
+      else c.caja(fijo, y, centro, grosor, altura, len, tile, tinte, esc);
+    };
+
+    for (const p of piezas)
+      poner(p.b - p.a, p.y1 - p.y0, a0 + (p.a + p.b) / 2, PISO + (p.y0 + p.y1) / 2, gr, T.yeso, TINTE.muro);
+    poner(largo + gr, 0.4, a0 + largo / 2, PISO + 0.2, gr + 0.14, T.tabla, TINTE.zocalo, 0.5);
+
+    for (const h of huecos) {
+      const len = h.b - h.a, alt = h.y1 - h.y0;
+      const cen = a0 + (h.a + h.b) / 2, y = PISO + (h.y0 + h.y1) / 2;
+      if (h.puerta) {
+        // solo el marco: el vano queda abierto para poder pasar
+        poner(len + 0.3, 0.16, cen, PISO + h.y1 + 0.08, gr + 0.1, T.tabla, TINTE.maderaM, 0.5);
+        poner(0.16, alt + 0.16, cen - len / 2 - 0.08, PISO + h.y0 + alt / 2, gr + 0.1, T.tabla, TINTE.maderaM, 0.5);
+        poner(0.16, alt + 0.16, cen + len / 2 + 0.08, PISO + h.y0 + alt / 2, gr + 0.1, T.tabla, TINTE.maderaM, 0.5);
+      } else {
+        // marco: barras arriba, abajo, a los lados y un travesaño al centro
+        poner(len + 0.26, 0.13, cen, PISO + h.y1 + 0.065, gr + 0.08, T.tabla, TINTE.maderaM, 0.4);
+        poner(len + 0.26, 0.13, cen, PISO + h.y0 - 0.065, gr + 0.08, T.tabla, TINTE.maderaM, 0.4);
+        poner(0.13, alt, cen - len / 2 - 0.065, y, gr + 0.08, T.tabla, TINTE.maderaM, 0.4);
+        poner(0.13, alt, cen + len / 2 + 0.065, y, gr + 0.08, T.tabla, TINTE.maderaM, 0.4);
+        poner(0.08, alt, cen, y, gr + 0.06, T.tabla, TINTE.maderaM, 0.4);
+        const brilloVidrio = { transparent: true, opacity: 0.5, brillo: '#93A6AE', dureza: 80 };
+        const vidrio = ejeX
+          ? caja(len, alt, 0.06, COLOR.vidrio, cen, y, fijo, brilloVidrio)
+          : caja(0.06, alt, len, COLOR.vidrio, fijo, y, cen, brilloVidrio);
+        vidrio.material = vidrio.material.clone();
+        vidrio.castShadow = false;
+        vidrio.userData.op0 = 0.5;
+        this.ventanas.push(vidrio);
+        g.add(vidrio);
+      }
+    }
+
+    const malla = c.malla(this.material());
+    malla.userData.op0 = 1;
+    g.add(malla);
+    this.grupo.add(g);
+    const n = { S: [0, 1], N: [0, -1], E: [1, 0], O: [-1, 0] }[id];
+    this.muros.push({ grupo: g, nx: n[0], nz: n[1], op: 1 });
+  }
+
+  /* ---------------- muebles (mismas medidas y anclajes de antes) ---------------- */
+  cama() {
+    const m = new Mueble({
+      nombre: 'Cama', emoji: '💤', accion: 'durmiendo', verbo: 'Dormir',
+      need: 'energia', tasa: 9, x: -5.2, z: -3.2,
+      anclaX: -5.2, anclaZ: -0.9, mirar: Math.PI, pose: 'acostado',
+      poseX: -5.2, poseZ: -2.9, poseY: 0.86, poseRot: 0.4,
+      rect: [-6.6, -5.2, -3.8, -1.2]
+    });
+    const c = this.nuevo();
+    c.caja(-5.2, PISO + 0.21, -3.2, 2.7, 0.42, 3.9, T.tabla, TINTE.maderaC, 0.6);
+    c.caja(-5.2, PISO + 0.58, -3.2, 2.5, 0.34, 3.6, T.tela, TINTE.crema, 0.6);
+    c.caja(-5.2, PISO + 0.80, -2.6, 2.5, 0.16, 2.3, T.tela, TINTE.rosa, 0.6);
+    c.caja(-5.2, PISO + 0.84, -4.5, 1.9, 0.22, 0.66, T.tela, '#FFFFFF', 0.5);
+    c.caja(-5.2, PISO + 0.72, -5.15, 2.7, 1.0, 0.24, T.tabla, TINTE.maderaM, 0.6);
+    m.grupo.add(c.malla(this.material()));
+    this.muebles.push(m);
+  }
+
+  cocina() {
+    const m = new Mueble({
+      nombre: 'Cocina', emoji: '🍳', accion: 'cocinando', verbo: 'Cocinar',
+      need: 'hambre', tasa: 11, x: 5.2, z: -4.4,
+      anclaX: 5.2, anclaZ: -2.8, mirar: Math.PI, pose: 'de pie',
+      rect: [1.4, -5.3, 7.1, -3.7]
+    });
+    const c = this.nuevo();
+    c.caja(4.2, PISO + 0.52, -4.5, 5.6, 1.05, 1.5, T.tabla, TINTE.crema, 0.7);
+    c.caja(4.2, PISO + 1.11, -4.5, 5.8, 0.14, 1.66, T.liso, TINTE.piedra, 0.7);
+    c.caja(5.3, PISO + 1.20, -4.5, 1.5, 0.06, 1.1, T.liso, TINTE.metal, 0.5);
+    for (const dx of [-0.35, 0.35]) for (const dz of [-0.26, 0.26])
+      c.caja(5.3 + dx, PISO + 1.25, -4.5 + dz, 0.34, 0.05, 0.34, T.liso, TINTE.tinta, 0.4);
+    c.caja(2.3, PISO + 1.14, -4.5, 1.0, 0.1, 0.75, T.liso, '#AFC3C9', 0.5);
+    c.caja(2.3, PISO + 1.35, -4.85, 0.08, 0.42, 0.08, T.liso, TINTE.metal, 0.4);
+    c.caja(3.0, PISO + 2.35, -5.05, 2.6, 0.8, 0.4, T.tabla, TINTE.maderaC, 0.6);
+    c.caja(1.6, PISO + 1.33, -4.4, 0.44, 0.3, 0.44, T.liso, TINTE.maceta, 0.4);
+    c.caja(1.6, PISO + 1.62, -4.4, 0.56, 0.34, 0.56, T.hojas, TINTE.hoja, 0.5);
+    m.grupo.add(c.malla(this.material()));
+    this.muebles.push(m);
+  }
+
+  sofa() {
+    const m = new Mueble({
+      nombre: 'Sofá', emoji: '🛋️', accion: 'descansando', verbo: 'Sentarse',
+      need: 'energia', tasa: 3.4, need2: 'diversion', tasa2: 1.6,
+      x: 3.4, z: 2.2, anclaX: 1.8, anclaZ: 2.2, mirar: Math.PI / 2,
+      pose: 'sentado', poseX: 3.45, poseZ: 2.2, poseY: 0.52, poseRot: Math.PI / 2,
+      rect: [2.6, 0.8, 4.3, 3.6]
+    });
+    const c = this.nuevo();
+    c.caja(3.4, PISO + 0.28, 2.2, 1.5, 0.45, 2.8, T.tela, TINTE.salvia, 0.6);
+    c.caja(2.85, PISO + 0.75, 2.2, 0.42, 0.95, 2.8, T.tela, TINTE.salviaOsc, 0.6);
+    c.caja(3.45, PISO + 0.70, 0.95, 1.45, 0.42, 0.35, T.tela, TINTE.salviaOsc, 0.6);
+    c.caja(3.45, PISO + 0.70, 3.45, 1.45, 0.42, 0.35, T.tela, TINTE.salviaOsc, 0.6);
+    c.caja(3.50, PISO + 0.60, 1.60, 1.2, 0.2, 1.0, T.tela, TINTE.mostaza, 0.5);
+    c.caja(3.50, PISO + 0.60, 2.80, 1.2, 0.2, 1.0, T.tela, TINTE.rosa, 0.5);
+    for (const dz of [-1.25, 1.25])
+      c.caja(3.4, PISO + 0.05, 2.2 + dz, 1.3, 0.1, 0.2, T.tabla, TINTE.maderaM, 0.4);
+    m.grupo.add(c.malla(this.material()));
+    this.muebles.push(m);
+  }
+
+  tele() {
+    const m = new Mueble({
+      nombre: 'Tele', emoji: '📺', accion: 'viendo la tele', verbo: 'Ver la tele',
+      need: 'diversion', tasa: 10, x: 6.8, z: 2.2,
+      anclaX: 5.6, anclaZ: 2.2, mirar: Math.PI / 2, pose: 'de pie',
+      rect: [6.2, 0.9, 7.3, 3.5]
+    });
+    const c = this.nuevo();
+    c.caja(6.85, PISO + 0.35, 2.2, 0.7, 0.7, 2.4, T.tabla, TINTE.maderaC, 0.6);
+    c.caja(6.72, PISO + 1.40, 2.2, 0.22, 1.35, 2.1, T.liso, TINTE.tinta, 0.5);
+    c.caja(6.85, PISO + 0.83, 1.2, 0.42, 0.26, 0.42, T.liso, TINTE.maceta, 0.4);
+    c.caja(6.85, PISO + 1.08, 1.2, 0.5, 0.3, 0.5, T.hojas, TINTE.hoja, 0.5);
+    m.grupo.add(c.malla(this.material()));
+    const pantalla = caja(0.06, 1.15, 1.9, COLOR.pantalla, 6.58, PISO + 1.4, 2.2);
+    pantalla.material = new THREE.MeshPhongMaterial({ color: new THREE.Color(COLOR.pantalla), specular: new THREE.Color('#5a6a72'), shininess: 60 });
+    pantalla.castShadow = false;
+    this.pantalla = pantalla;
+    m.grupo.add(pantalla);
+    this.muebles.push(m);
+  }
+
+  mesa() {
+    const m = new Mueble({
+      nombre: 'Mesa', emoji: '🍰', accion: 'merendando', verbo: 'Merendar',
+      need: 'hambre', tasa: 5, need2: 'diversion', tasa2: 3,
+      x: -2.6, z: 3.2, anclaX: 0.3, anclaZ: 3.2, mirar: -Math.PI / 2,
+      pose: 'sentado', poseX: -1.05, poseZ: 3.2, poseY: 0.53, poseRot: -Math.PI / 2,
+      rect: [-4.3, 1.9, -0.9, 4.5]
+    });
+    const c = this.nuevo();
+    c.caja(-2.6, PISO + 0.88, 3.2, 2.4, 0.16, 1.7, T.tabla, TINTE.maderaC, 0.7);
+    for (const dx of [-1.0, 1.0]) for (const dz of [-0.65, 0.65])
+      c.caja(-2.6 + dx, PISO + 0.4, 3.2 + dz, 0.14, 0.8, 0.14, T.tabla, TINTE.maderaM, 0.4);
+    for (const dx of [-1.55, 1.55]) {
+      c.caja(-2.6 + dx, PISO + 0.46, 3.2, 0.7, 0.12, 0.7, T.tabla, TINTE.maderaC, 0.5);
+      c.caja(-2.6 + dx * 1.35, PISO + 0.75, 3.2, 0.14, 0.7, 0.7, T.tabla, TINTE.maderaM, 0.5);
+      for (const p of [[-0.25, -0.25], [0.25, -0.25], [-0.25, 0.25], [0.25, 0.25]])
+        c.caja(-2.6 + dx + p[0], PISO + 0.23, 3.2 + p[1], 0.1, 0.46, 0.1, T.tabla, TINTE.maderaM, 0.4);
+    }
+    c.caja(-2.85, PISO + 1.03, 3.05, 0.3, 0.2, 0.3, T.liso, '#FFFFFF', 0.4);
+    c.caja(-2.30, PISO + 0.99, 3.40, 0.5, 0.12, 0.5, T.tela, TINTE.rosa, 0.4);
+    m.grupo.add(c.malla(this.material()));
+    this.muebles.push(m);
+  }
+
+  planta(x, z) {
+    const m = new Mueble({
+      nombre: 'Planta', emoji: '🌱', accion: 'regando', verbo: 'Regar',
+      need: 'diversion', tasa: 4.5, x, z,
+      anclaX: x + (x > 0 ? -1.3 : 1.3), anclaZ: z, mirar: x > 0 ? Math.PI / 2 : -Math.PI / 2,
+      pose: 'de pie', rect: [x - 0.6, z - 0.6, x + 0.6, z + 0.6]
+    });
+    const c = this.nuevo();
+    c.caja(x, PISO + 0.3, z, 0.86, 0.6, 0.86, T.liso, TINTE.maceta, 0.5);
+    c.caja(x, PISO + 0.62, z, 0.94, 0.1, 0.94, T.liso, '#C97457', 0.5);
+    c.caja(x, PISO + 1.05, z, 1.1, 0.8, 1.1, T.hojas, TINTE.hoja, 0.6);
+    c.caja(x + 0.3, PISO + 1.55, z - 0.15, 0.7, 0.5, 0.7, T.hojas, TINTE.hoja, 0.6);
+    c.caja(x - 0.28, PISO + 1.45, z + 0.2, 0.55, 0.42, 0.55, T.hojas, TINTE.hoja, 0.6);
+    m.grupo.add(c.malla(this.material()));
+    this.muebles.push(m);
+  }
+
+  lampara(x, z) {
+    const c = this.nuevo();
+    c.caja(x, PISO + 0.05, z, 0.56, 0.1, 0.56, T.tabla, TINTE.maderaM, 0.4);
+    c.caja(x, PISO + 0.9, z, 0.14, 1.7, 0.14, T.tabla, TINTE.maderaM, 0.4);
+    this.grupo.add(c.malla(this.material()));
+
+    const tulipa = caja(0.9, 0.55, 0.9, COLOR.luzCalida, x, PISO + 1.95, z);
+    tulipa.material = new THREE.MeshPhongMaterial({ color: new THREE.Color(COLOR.luzCalida), specular: new THREE.Color('#3a3428'), shininess: 20 });
+    this.tulipa = tulipa;
+    this.grupo.add(tulipa);
+
+    const luz = new THREE.PointLight(0xffd9a0, 0, 13, 2);
+    luz.position.set(x, PISO + 1.8, z);
+    this.grupo.add(luz);
+    this.luces.push(luz);
+    const luz2 = new THREE.PointLight(0xffcf90, 0, 11, 2);
+    luz2.position.set(CASA.x + 4, PISO + 2.4, CASA.z - 2);
+    this.grupo.add(luz2);
+    this.luces.push(luz2);
+  }
+
+  alfombra(x, z, w, d, tinte) {
+    const m = this.nuevo().caja(x, PISO + 0.03, z, w, 0.06, d, T.tela, tinte, 0.8).malla(this.material());
+    m.castShadow = false;
+    this.grupo.add(m);
+  }
+
+  /* ---------------- recorte tipo Sims + luces ---------------- */
+  actualizar(dt, camDir, personaje, noche, recortar) {
+    if (recortar === undefined) recortar = true;
+    const adentro = this.dentro(personaje.x, personaje.z, 1.2) &&
+                    personaje.y < PISO + CASA.alto + 0.8;        // volando por encima no cuenta
+    const quiereFuera = this.techoManual !== null ? this.techoManual : (recortar && adentro);
+    this.techoVisible += ((quiereFuera ? 0 : 1) - this.techoVisible) * Math.min(1, dt * 7);
+    const t = this.techoVisible;
+    this.techo.material.opacity = t;
+    this.techo.visible = t > 0.02;
+
+    for (const m of this.muros) {
+      const haciaCamara = m.nx * camDir.x + m.nz * camDir.z;
+      const obj = (recortar && haciaCamara < -0.15 && this.techoVisible < 0.9) ? 0.1 : 1;
+      m.op += (obj - m.op) * Math.min(1, dt * 7);
+      m.grupo.traverse(o => {
+        if (!o.material) return;
+        o.material.opacity = (o.userData.op0 === undefined ? 1 : o.userData.op0) * m.op;
+        o.visible = m.op > 0.03;
+        o.castShadow = m.op > 0.6;
+      });
+    }
+
+    for (const l of this.luces) l.intensity = noche * 2.3;
+
+    // el fuego del hogar: las llamas bailan y la luz parpadea con ellas
+    if (this.llamas) {
+      const th = performance.now() / 1000;
+      let mezcla = 0;
+      for (const ll of this.llamas) {
+        const s = 0.75 + Math.abs(Math.sin(th * ll.f + ll.p)) * 0.5;
+        ll.malla.scale.y = s;
+        ll.malla.position.y = ll.base + (s - 1) * 0.16;
+        mezcla += s;
+      }
+      this.luzFuego.intensity = 1.1 + (mezcla / this.llamas.length - 1) * 1.6;
+    }
+    const c = new THREE.Color(COLOR.luzCalida);
+    this.tulipa.material.emissive = c.clone().multiplyScalar(noche * 0.95);
+    for (const v of this.ventanas) v.material.emissive = c.clone().multiplyScalar(noche * 0.6);
+    this.pantalla.material.emissive = new THREE.Color('#5F97B4').multiplyScalar(this.teleOn ? 0.5 : 0.05);
+    if (this.farolMuelle) this.farolMuelle.material.emissive = c.clone().multiplyScalar(noche * 0.95);
+  }
+}
+
+/* ============================================================
+   NAVEGACIÓN: rejilla caminable + A*
+   ============================================================ */
+class Nav {
+  constructor() {
+    this.X0 = -WORLD_CHUNKS * CHUNK_SIZE;
+    this.W = WORLD_CHUNKS * CHUNK_SIZE * 2;
+    const n = this.W * this.W;
+    this.alt = new Float32Array(n);
+    this.libre = new Uint8Array(n);
+    this.tope = new Float32Array(n);      // hasta qué altura estorba cada celda (para volar)
+    this.g = new Float32Array(n);
+    this.padre = new Int32Array(n);
+    this.sello = new Int32Array(n);
+    this.marca = 0;
+  }
+  celda(x, z) {
+    const cx = Math.floor(x) - this.X0, cz = Math.floor(z) - this.X0;
+    if (cx < 0 || cz < 0 || cx >= this.W || cz >= this.W) return -1;
+    return cz * this.W + cx;
+  }
+  cx(i) { return (i % this.W) + this.X0; }
+  cz(i) { return Math.floor(i / this.W) + this.X0; }
+  altura(x, z) { const i = this.celda(x, z); return i < 0 ? PISO : this.alt[i]; }
+  caminable(x, z) { const i = this.celda(x, z); return i >= 0 && this.libre[i] === 1; }
+
+  construir(world, casa) {
+    for (let cz = 0; cz < this.W; cz++) {
+      for (let cx = 0; cx < this.W; cx++) {
+        const wx = cx + this.X0, wz = cz + this.X0, i = cz * this.W + cx;
+        const h = world.height(wx, wz);
+        this.alt[i] = h + 1;
+        let ok = h > SEA_LEVEL;                                   // ni agua ni orilla sumergida
+        if (ok && isSolid(world.getBlock(wx, h + 1, wz))) ok = false;   // árbol encima
+        this.libre[i] = ok ? 1 : 0;
+      }
+    }
+    // dentro de la casa el suelo es la duela
+    const b = casa.bordes;
+    for (let wz = Math.floor(b.z0) - 1; wz <= Math.ceil(b.z1); wz++)
+      for (let wx = Math.floor(b.x0) - 1; wx <= Math.ceil(b.x1); wx++) {
+        const i = this.celda(wx, wz);
+        if (i >= 0) this.alt[i] = PISO;
+      }
+    // muros bloqueados, puerta abierta
+    this.bloquear(b.x0 - 0.5, b.z0 - 0.5, b.x1 + 0.5, b.z0 + 0.5);
+    this.bloquear(b.x0 - 0.5, b.z1 - 0.5, b.x1 + 0.5, b.z1 + 0.5);
+    this.bloquear(b.x0 - 0.5, b.z0 - 0.5, b.x0 + 0.5, b.z1 + 0.5);
+    this.bloquear(b.x1 - 0.5, b.z0 - 0.5, b.x1 + 0.5, b.z1 + 0.5);
+    this.abrir(-1.6, b.z1 - 0.6, 1.6, b.z1 + 0.6, PISO);
+    // muebles
+    for (const m of casa.muebles) this.bloquear(m.rect[0], m.rect[1], m.rect[2], m.rect[3]);
+    // el sitio donde se para el personaje siempre libre
+    for (const m of casa.muebles) this.abrir(m.anclaX - 0.4, m.anclaZ - 0.4, m.anclaX + 0.4, m.anclaZ + 0.4, PISO);
+
+    /* --- alturas de bloqueo: suelo, copas de los árboles y la casa entera --- */
+    for (let cz = 0; cz < this.W; cz++) {
+      for (let cx = 0; cx < this.W; cx++) {
+        const wx = cx + this.X0, wz = cz + this.X0, i = cz * this.W + cx;
+        const h = world.height(wx, wz);
+        let top = h <= SEA_LEVEL ? SEA_LEVEL + 1 : h + 1;      // se puede posar en el agua
+        for (let y = h + 9; y > h + 1; y--)
+          if (isSolid(world.getBlock(wx, y, wz))) { top = y + 1; break; }
+        this.tope[i] = top;
+      }
+    }
+    this.bloquearAlto(b.x0 - 0.7, b.z0 - 0.7, b.x1 + 0.7, b.z1 + 0.7, ALTO_TEJADO);
+  }
+
+  bloquearAlto(x0, z0, x1, z1, alto) {
+    for (let z = Math.floor(z0); z <= Math.ceil(z1); z++)
+      for (let x = Math.floor(x0); x <= Math.ceil(x1); x++) {
+        if (x + 1 <= x0 || x >= x1 || z + 1 <= z0 || z >= z1) continue;
+        const i = this.celda(x, z);
+        if (i >= 0 && alto > this.tope[i]) this.tope[i] = alto;
+      }
+  }
+  // techo sobre el que se puede posar quien vuela
+  altoTope(x, z) { const i = this.celda(x, z); return i < 0 ? PISO : this.tope[i]; }
+
+  bloquear(x0, z0, x1, z1) {
+    for (let z = Math.floor(z0); z <= Math.ceil(z1); z++)
+      for (let x = Math.floor(x0); x <= Math.ceil(x1); x++) {
+        if (x + 1 <= x0 || x >= x1 || z + 1 <= z0 || z >= z1) continue;   // sin solape
+        const i = this.celda(x, z);
+        if (i >= 0) this.libre[i] = 0;
+      }
+  }
+  abrir(x0, z0, x1, z1, alt) {
+    for (let z = Math.floor(z0); z <= Math.floor(z1); z++)
+      for (let x = Math.floor(x0); x <= Math.floor(x1); x++) {
+        const i = this.celda(x, z);
+        if (i < 0) continue;
+        const cx = x + 0.5, cz = z + 0.5;
+        if (cx < x0 || cx > x1 || cz < z0 || cz > z1) continue;
+        this.libre[i] = 1;
+        if (alt !== undefined) this.alt[i] = alt;
+      }
+  }
+
+  // celda libre más cercana (por si clicas en un árbol o en el agua)
+  cerca(x, z, r = 6) {
+    let mejor = -1, dm = 1e9;
+    for (let dz = -r; dz <= r; dz++) for (let dx = -r; dx <= r; dx++) {
+      const i = this.celda(x + dx, z + dz);
+      if (i < 0 || !this.libre[i]) continue;
+      const d = dx * dx + dz * dz;
+      if (d < dm) { dm = d; mejor = i; }
+    }
+    return mejor;
+  }
+
+  // A* en 8 direcciones, con escalones de 1 bloque como máximo
+  ruta(x0, z0, x1, z1) {
+    let ini = this.celda(x0, z0), fin = this.celda(x1, z1);
+    if (ini < 0) return null;
+    if (fin < 0 || !this.libre[fin]) fin = this.cerca(x1, z1);
+    if (fin < 0 || ini === fin) return null;
+    if (!this.libre[ini]) { const a = this.cerca(x0, z0, 2); if (a < 0) return null; ini = a; }
+
+    const W = this.W, marca = ++this.marca;
+    const heap = [], hx = this.cx(fin), hz = this.cz(fin);
+    const h = i => Math.hypot(this.cx(i) - hx, this.cz(i) - hz);
+    const push = (f, i) => {
+      heap.push([f, i]);
+      let c = heap.length - 1;
+      while (c > 0) { const p = (c - 1) >> 1; if (heap[p][0] <= heap[c][0]) break; [heap[p], heap[c]] = [heap[c], heap[p]]; c = p; }
+    };
+    const pop = () => {
+      const top = heap[0], last = heap.pop();
+      if (heap.length) {
+        heap[0] = last;
+        let c = 0;
+        for (;;) {
+          const l = c * 2 + 1, r = l + 1; let m = c;
+          if (l < heap.length && heap[l][0] < heap[m][0]) m = l;
+          if (r < heap.length && heap[r][0] < heap[m][0]) m = r;
+          if (m === c) break;
+          [heap[m], heap[c]] = [heap[c], heap[m]]; c = m;
+        }
+      }
+      return top;
+    };
+
+    this.sello[ini] = marca; this.g[ini] = 0; this.padre[ini] = -1;
+    push(h(ini), ini);
+    let visitados = 0, mejor = ini, mejorH = h(ini);
+
+    while (heap.length && visitados < 9000) {
+      const [, i] = pop();
+      if (i === fin) { mejor = fin; break; }
+      visitados++;
+      const ix = this.cx(i), iz = this.cz(i), ia = this.alt[i], gi = this.g[i];
+      const hi = h(i);
+      if (hi < mejorH) { mejorH = hi; mejor = i; }
+
+      for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
+        if (!dx && !dz) continue;
+        const j = this.celda(ix + dx, iz + dz);
+        if (j < 0 || !this.libre[j]) continue;
+        if (Math.abs(this.alt[j] - ia) > 1.05) continue;              // escalón muy alto
+        if (dx && dz) {                                               // sin cortar esquinas
+          const a = this.celda(ix + dx, iz), b = this.celda(ix, iz + dz);
+          if (a < 0 || b < 0 || !this.libre[a] || !this.libre[b]) continue;
+        }
+        const costo = gi + ((dx && dz) ? 1.414 : 1);
+        if (this.sello[j] === marca && this.g[j] <= costo) continue;
+        this.sello[j] = marca; this.g[j] = costo; this.padre[j] = i;
+        push(costo + h(j) * 1.05, j);
+      }
+    }
+
+    let cur = (this.sello[fin] === marca) ? fin : mejor;
+    const celdas = [];
+    while (cur !== -1 && cur !== ini) { celdas.push(cur); cur = this.padre[cur]; }
+    celdas.reverse();
+    if (!celdas.length) return null;
+
+    // suavizado: salta puntos intermedios si hay línea recta libre
+    const pts = celdas.map(i => ({ x: this.cx(i) + 0.5, z: this.cz(i) + 0.5, y: this.alt[i] }));
+    const salida = [];
+    let desde = { x: x0, z: z0, y: this.altura(x0, z0) }, k = 0;
+    while (k < pts.length) {
+      let mejorK = k;
+      for (let t = pts.length - 1; t > k; t--) { if (this.recto(desde, pts[t])) { mejorK = t; break; } }
+      salida.push(pts[mejorK]);
+      desde = pts[mejorK];
+      k = mejorK + 1;
+    }
+    // remate: el punto exacto pedido, si está a un paso
+    const ult = salida[salida.length - 1];
+    if (this.caminable(x1, z1) && Math.hypot(x1 - ult.x, z1 - ult.z) < 1.9)
+      salida.push({ x: x1, z: z1, y: this.altura(x1, z1) });
+    return salida;
+  }
+
+  recto(a, b) {
+    const d = Math.hypot(b.x - a.x, b.z - a.z), pasos = Math.ceil(d / 0.4);
+    let prev = this.altura(a.x, a.z);
+    for (let s = 1; s <= pasos; s++) {
+      const t = s / pasos, x = lerp(a.x, b.x, t), z = lerp(a.z, b.z, t);
+      if (!this.caminable(x, z)) return false;
+      for (const o of [[0.32, 0], [-0.32, 0], [0, 0.32], [0, -0.32]])
+        if (!this.caminable(x + o[0], z + o[1])) return false;       // deja margen al cuerpo
+      const al = this.altura(x, z);
+      if (Math.abs(al - prev) > 1.05) return false;
+      prev = al;
+    }
+    return true;
+  }
+}
+
+/* ============================================================
+   EL GATO: control directo con joystick, salto y trote
+   ============================================================ */
+const GATO = {
+  pelo:'#E0A362', pelo2:'#C08048', crema:'#F7E7CE', rosa:'#E4888A',
+  tinta:'#3C3630', collar:'#CC6459', cascabel:'#F2C75C'
+};
+const GRAVEDAD = 22, FUERZA_SALTO = 7.0, RADIO = 0.26;
+
+class Personaje {
+  constructor(scene, nav, assets) {
+    this.nav = nav; this.assets = assets;
+    this.x = 0; this.z = 11; this.y = nav.altura(0, 11);
+    this.ang = Math.PI;
+    this.vel = 3.2;
+    this.vy = 0; this.enSuelo = true;
+    this.ruta = null; this.paso = 0;
+    this.estado = 'quieto';            // quieto | camina (ruta) | libre (mando) | usando
+    this.mueble = null; this.alLlegar = null;
+    this.mandoX = 0; this.mandoZ = 0; this.mandoM = 0;
+    this.aplaste = 0; this.vyPrev = 0;
+    this.forzarAng = null;
+    this.cuello = null;      // {yaw, pitch} en primera persona
+    this.t = 0; this.fase = 0;
+    this.poseActual = 'de pie';
+    this.esPtera = false;
+    this.ojos = { cy: CUELLO.y, cz: CUELLO.z, oy: OJO.y, oz: OJO.z, giro: GIRO_CUELLO, cabeceo: CABECEO_CUELLO };
+    this.burbujas = new Map();
+    this.build(scene);
+  }
+
+  build(scene) {
+    const G = GATO;
+    const material = new THREE.MeshPhongMaterial({
+      map: this.assets.atlas, vertexColors: true,
+      specular: new THREE.Color('#26241d'), shininess: 22
+    });
+    const pieza = f => { const c = new Constructor(this.assets); f(c); return c.malla(material); };
+
+    this.raiz = new THREE.Group();
+    this.cuerpo = new THREE.Group();
+    this.raiz.add(this.cuerpo);
+
+    // tronco, barriga, rayas y collar
+    this.cuerpo.add(pieza(c => {
+      c.caja(0, 0.46, 0, 0.54, 0.44, 0.98, T.liso, G.pelo, 0.35);
+      c.caja(0, 0.29, 0.02, 0.47, 0.18, 0.88, T.liso, G.crema, 0.35);
+      c.caja(0, 0.685, 0.16, 0.5, 0.05, 0.13, T.liso, G.pelo2, 0.3);
+      c.caja(0, 0.685, -0.06, 0.5, 0.05, 0.13, T.liso, G.pelo2, 0.3);
+      c.caja(0, 0.685, -0.28, 0.46, 0.05, 0.12, T.liso, G.pelo2, 0.3);
+      c.caja(0, 0.56, 0.47, 0.46, 0.13, 0.1, T.liso, G.collar, 0.3);
+      c.caja(0, 0.47, 0.5, 0.11, 0.11, 0.09, T.liso, G.cascabel, 0.25);
+    }));
+
+    // cabeza (grupo propio para que mire y cabecee)
+    this.cabeza = new THREE.Group();
+    this.cabeza.position.set(0, 0.64, 0.52);
+    this.cabeza.add(pieza(c => {
+      c.caja(0, 0.08, 0.06, 0.46, 0.42, 0.42, T.liso, G.pelo, 0.35);
+      c.caja(0, 0.155, 0.07, 0.2, 0.28, 0.42, T.liso, G.pelo2, 0.3);
+      c.caja(0, -0.02, 0.27, 0.26, 0.17, 0.12, T.liso, G.crema, 0.3);
+      c.caja(0, 0.02, 0.34, 0.1, 0.07, 0.05, T.liso, G.rosa, 0.25);
+      for (const l of [-1, 1]) {
+        c.caja(l * 0.13, 0.12, 0.27, 0.1, 0.11, 0.05, T.liso, G.tinta, 0.25);
+        c.caja(l * 0.155, 0.35, 0.02, 0.15, 0.19, 0.11, T.liso, G.pelo, 0.3);
+        c.caja(l * 0.155, 0.33, 0.07, 0.08, 0.1, 0.06, T.liso, G.rosa, 0.25);
+        c.caja(l * 0.27, -0.03, 0.22, 0.22, 0.02, 0.02, T.liso, G.crema, 0.2);
+        c.caja(l * 0.26, 0.02, 0.22, 0.2, 0.02, 0.02, T.liso, G.crema, 0.2);
+      }
+    }));
+    this.cuerpo.add(this.cabeza);
+
+    // cuatro patas: [delI, delD, traI, traD]
+    this.patas = [];
+    for (const [lx, lz] of [[-1, 1], [1, 1], [-1, -1], [1, -1]]) {
+      const g = new THREE.Group();
+      g.position.set(lx * 0.17, 0.34, lz * 0.31);
+      g.add(pieza(c => {
+        c.caja(0, -0.17, 0, 0.15, 0.34, 0.15, T.liso, GATO.pelo, 0.3);
+        c.caja(0, -0.32, 0.02, 0.17, 0.09, 0.19, T.liso, GATO.crema, 0.3);
+      }));
+      this.cuerpo.add(g); this.patas.push(g);
+    }
+
+    // cola
+    this.cola = new THREE.Group();
+    this.cola.position.set(0, 0.55, -0.48);
+    this.cola.add(pieza(c => {
+      c.caja(0, 0.04, -0.13, 0.13, 0.13, 0.28, T.liso, G.pelo, 0.3);
+      c.caja(0, 0.17, -0.26, 0.12, 0.17, 0.12, T.liso, G.pelo2, 0.3);
+      c.caja(0, 0.32, -0.26, 0.11, 0.15, 0.11, T.liso, G.pelo, 0.3);
+      c.caja(0, 0.42, -0.19, 0.11, 0.11, 0.15, T.liso, G.crema, 0.3);
+    }));
+    this.cuerpo.add(this.cola);
+
+    this.burbuja = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, depthTest: false, opacity: 0 }));
+    this.burbuja.scale.set(0.85, 0.85, 1);
+    this.burbuja.position.y = 1.5;
+    this.burbuja.renderOrder = 10;
+    this.raiz.add(this.burbuja);
+
+    scene.add(this.raiz);
+  }
+
+  emoji(e) {
+    if (!e) { this.burbuja.material.opacity = 0; return; }
+    if (!this.burbujas.has(e)) this.burbujas.set(e, this.assets.burbuja(e));
+    this.burbuja.material.map = this.burbujas.get(e);
+    this.burbuja.material.needsUpdate = true;
+    this.burbuja.material.opacity = 1;
+  }
+
+  /* ---------- órdenes ---------- */
+  irA(x, z, alLlegar, mueble) {
+    const r = this.nav.ruta(this.x, this.z, x, z);
+    this.mueble = mueble || null;
+    this.alLlegar = alLlegar || null;
+    if (!r || !r.length) {
+      if (this.alLlegar) { const f = this.alLlegar; this.alLlegar = null; f(); }
+      else this.estado = 'quieto';
+      return false;
+    }
+    this.ruta = r; this.paso = 0;
+    this.estado = 'camina';
+    this.pose('de pie');
+    return true;
+  }
+  saltar() {
+    if (!this.enSuelo || this.estado === 'usando') return false;
+    this.vy = FUERZA_SALTO;
+    this.enSuelo = false;
+    return true;
+  }
+  mando(x, z, m) { this.mandoX = x; this.mandoZ = z; this.mandoM = m; }
+
+  // ¿cabe el gato ahí? (con margen de cuerpo y escalones de un bloque)
+  puedeIr(x, z) {
+    for (const o of [[RADIO, 0], [-RADIO, 0], [0, RADIO], [0, -RADIO]]) {
+      const px = x + o[0], pz = z + o[1];
+      if (!this.nav.caminable(px, pz)) return false;
+      if (this.nav.altura(px, pz) - this.y > 1.05) return false;
+    }
+    return true;
+  }
+
+  pose(tipo) {
+    this.poseActual = tipo;
+    const P = this.patas;
+    if (tipo === 'sentado') {
+      P[0].rotation.x = 0; P[1].rotation.x = 0;
+      P[2].rotation.x = -1.35; P[3].rotation.x = -1.35;
+      this.cuerpo.rotation.x = -0.2;
+      this.cuerpo.position.y = -0.04;
+      this.cola.rotation.set(-0.5, 0.7, 0);
+    } else if (tipo === 'acostado') {
+      for (const p of P) p.rotation.x = -1.5;
+      this.cuerpo.rotation.x = 0;
+      this.cuerpo.position.y = -0.2;
+      this.cabeza.position.set(0, 0.5, 0.5);
+      this.cola.rotation.set(-0.2, 1.5, 0);
+    } else {
+      for (const p of P) p.rotation.x = 0;
+      this.cuerpo.rotation.x = 0;
+      this.cuerpo.position.y = 0;
+      this.cabeza.position.set(0, 0.64, 0.52);
+      this.cola.rotation.set(-0.2, 0, 0);
+    }
+  }
+
+  update(dt) {
+    this.t += dt;
+    const usando = this.estado === 'usando';
+
+    /* --- mando directo: manda sobre cualquier ruta --- */
+    if (!usando && this.mandoM > 0.06) {
+      if (this.ruta) { this.ruta = null; this.alLlegar = null; }
+      this.estado = 'libre';
+      const v = this.vel * this.mandoM;
+      const nx = this.x + this.mandoX * v * dt, nz = this.z + this.mandoZ * v * dt;
+      if (this.puedeIr(nx, this.z)) this.x = nx;
+      if (this.puedeIr(this.x, nz)) this.z = nz;
+      this.girarHacia(Math.atan2(this.mandoX, this.mandoZ), dt, 14);
+    } else if (this.estado === 'libre') {
+      this.estado = 'quieto';
+    }
+    // en primera persona el cuerpo mira siempre hacia donde apunta la vista
+    if (this.forzarAng !== null && !usando) this.girarHacia(this.forzarAng, dt, 10);
+
+    /* --- ruta del clic --- */
+    if (this.estado === 'camina' && this.ruta) {
+      const meta = this.ruta[this.paso];
+      const dx = meta.x - this.x, dz = meta.z - this.z, d = Math.hypot(dx, dz);
+      if (d < 0.12) {
+        this.paso++;
+        if (this.paso >= this.ruta.length) {
+          this.ruta = null; this.estado = 'quieto';
+          if (this.alLlegar) { const f = this.alLlegar; this.alLlegar = null; f(); }
+        }
+      } else {
+        const paso = Math.min(this.vel * dt, d);
+        this.x += dx / d * paso; this.z += dz / d * paso;
+        this.girarHacia(Math.atan2(dx, dz), dt, 12);
+      }
+    }
+
+    /* --- suelo, escalones y salto --- */
+    const suelo = this.nav.altura(this.x, this.z);
+    if (this.enSuelo && this.vy === 0 && suelo >= this.y - 0.1) {
+      this.y += (suelo - this.y) * Math.min(1, dt * 14);
+      if (Math.abs(suelo - this.y) < 0.02) this.y = suelo;
+    } else {
+      this.enSuelo = false;
+      this.vy -= GRAVEDAD * dt;
+      this.y += this.vy * dt;
+      if (this.y <= suelo) { this.y = suelo; this.vy = 0; this.enSuelo = true; }
+    }
+    if (this.y < -6) { this.x = 0; this.z = 11; this.y = this.nav.altura(0, 11); this.vy = 0; }
+
+    // aterrizaje: pequeño aplaste elástico
+    if (this.enSuelo && this.vyPrev < -4) this.aplaste = Math.min(0.13, -this.vyPrev * 0.017);
+    this.vyPrev = this.vy;
+    this.aplaste *= Math.max(0, 1 - dt * 7);
+
+    this.animar(dt);
+
+    if (this.estado === 'usando' && this.mueble && this.mueble.pose !== 'de pie') {
+      const m = this.mueble;
+      this.raiz.position.set(m.poseX, PISO + (m.poseY || 0), m.poseZ);
+      this.raiz.rotation.y = m.poseRot || 0;
+    } else {
+      this.raiz.position.set(this.x, this.y, this.z);
+      this.raiz.rotation.y = this.ang;
+    }
+    const altoBurbuja = this.poseActual === 'acostado' ? 1.1 : (this.poseActual === 'sentado' ? 1.35 : 1.45);
+    this.burbuja.position.y = altoBurbuja + Math.sin(this.t * 2.2) * 0.05;
+  }
+
+  girarHacia(objetivo, dt, k) {
+    let dif = objetivo - this.ang;
+    while (dif > Math.PI) dif -= Math.PI * 2;
+    while (dif < -Math.PI) dif += Math.PI * 2;
+    this.ang += dif * Math.min(1, dt * k);
+  }
+
+  animar(dt) {
+    const anda = this.estado === 'libre' || this.estado === 'camina';
+    const quieto = this.poseActual === 'sentado' || this.poseActual === 'acostado';
+    const ritmo = anda ? Math.max(0.45, this.mandoM || 1) : 0;
+    this.fase += dt * 11 * ritmo;
+
+    if (!quieto) {
+      if (!this.enSuelo) {
+        // en el aire: patas recogidas y cola estirada
+        this.patas[0].rotation.x = this.patas[1].rotation.x = -0.7;
+        this.patas[2].rotation.x = this.patas[3].rotation.x = 0.6;
+        this.cuerpo.rotation.x = clamp(-this.vy * 0.05, -0.25, 0.25);
+        this.cola.rotation.x = -0.7;
+        this.cuerpo.position.y = 0;
+      } else if (anda) {
+        // trote: diagonales alternas
+        const d = [0, Math.PI, Math.PI, 0];
+        for (let i = 0; i < 4; i++) this.patas[i].rotation.x = Math.sin(this.fase + d[i]) * 0.55;
+        this.cuerpo.position.y = Math.abs(Math.sin(this.fase)) * 0.035;
+        this.cuerpo.rotation.x = 0;
+        this.cola.rotation.x = -0.35 + Math.sin(this.fase * 0.5) * 0.1;
+      } else {
+        for (const p of this.patas) p.rotation.x *= 1 - Math.min(1, dt * 8);
+        this.cuerpo.position.y = Math.sin(this.t * 1.7) * 0.012;
+        this.cuerpo.rotation.x = 0;
+        this.cola.rotation.x = -0.2 + Math.sin(this.t * 1.5) * 0.1;
+      }
+      if (!this.cuello)
+        this.cabeza.rotation.x = anda ? Math.sin(this.fase * 0.5) * 0.05 : Math.sin(this.t * 1.2) * 0.07;
+    }
+    // aplaste al caer: se achata un instante y rebota
+    if (this.poseActual === 'de pie') {
+      this.cuerpo.position.y -= this.aplaste;
+      this.cuerpo.scale.y = 1 - this.aplaste * 1.6;
+      this.cuerpo.scale.x = this.cuerpo.scale.z = 1 + this.aplaste * 0.9;
+    }
+
+    // la cola siempre viva
+    this.cola.rotation.y = (this.poseActual === 'acostado' ? 1.5 : 0) + Math.sin(this.t * 2.3) * 0.32;
+
+    if (this.cuello) {
+      // el cuello gira hacia donde mira la cámara, con tope como un cuello de verdad
+      let dy = this.cuello.yaw - this.raiz.rotation.y;
+      while (dy > Math.PI) dy -= Math.PI * 2;
+      while (dy < -Math.PI) dy += Math.PI * 2;
+      dy = clamp(dy, -this.ojos.giro, this.ojos.giro);
+      const dp = clamp(-this.cuello.pitch * 0.6, -this.ojos.cabeceo, this.ojos.cabeceo);
+      const k = Math.min(1, dt * 16);
+      this.cabeza.rotation.y += (dy - this.cabeza.rotation.y) * k;
+      this.cabeza.rotation.x += (dp - this.cabeza.rotation.x) * k;
+      this.cabeza.rotation.z += (0 - this.cabeza.rotation.z) * k;
+    } else {
+      this.cabeza.rotation.y += (0 - this.cabeza.rotation.y) * Math.min(1, dt * 8);
+      this.cabeza.rotation.z = Math.sin(this.t * 0.9) * 0.05;
+    }
+  }
+}
+
+/* ============================================================
+   CÁMARA ISOMÉTRICA (giros de 90°, zoom, paneo)
+   ============================================================ */
+const CAM_DIST = 90;
+
+class CamaraIso {
+  constructor(aspecto) {
+    this.foco = new THREE.Vector3(0, PISO, 3);
+    this.yaw = Math.PI / 4; this.yawSuave = this.yaw;
+    this.zoom = ES_MOVIL ? 19 : 24; this.zoomSuave = this.zoom;
+    this.pitch = 0.62;
+    this.seguir = true;
+    this.prisa = 0;                       // acelera el seguimiento tras un cambio brusco
+    this.cam = new THREE.OrthographicCamera(-10, 10, 10, -10, 1, 400);
+    this.resize(aspecto);
+  }
+  resize(aspecto) {
+    this.aspecto = aspecto;
+    const z = this.zoomSuave;
+    // en pantalla vertical el zoom fija el ANCHO, si no la casa no cabe
+    let alto = z, ancho = z * aspecto;
+    if (aspecto < 1) { ancho = z; alto = z / aspecto; }
+    this.anchoVista = ancho; this.altoVista = alto;
+    const c = this.cam;
+    c.left = -ancho / 2; c.right = ancho / 2; c.top = alto / 2; c.bottom = -alto / 2;
+    c.near = 1; c.far = 400;
+    c.updateProjectionMatrix();
+  }
+  girar(d) { this.yaw += d * Math.PI / 2; }
+  // giro continuo arrastrando con el botón derecho (sin pasos de 90°)
+  girarLibre(d) { this.yaw += d; this.yawSuave += d; }
+  zoomear(f) { this.zoom = clamp(this.zoom * f, 11, 50); }
+  // ejes del suelo según el giro actual
+  ejes() {
+    const s = Math.sin(this.yawSuave), c = Math.cos(this.yawSuave);
+    return { adelante: { x: -s, z: -c }, derecha: { x: c, z: -s } };
+  }
+  pan(dx, dz) {
+    const e = this.ejes();
+    this.foco.x += e.derecha.x * dx + e.adelante.x * dz;
+    this.foco.z += e.derecha.z * dx + e.adelante.z * dz;
+    const L = ISLA_R - 6;
+    this.foco.x = clamp(this.foco.x, -L, L);
+    this.foco.z = clamp(this.foco.z, -L, L);
+    this.seguir = false;
+  }
+  centrar() { this.seguir = true; this.prisa = 0.5; }
+  dir() {                                  // hacia dónde mira, en el plano
+    const e = this.ejes();
+    return { x: e.adelante.x, z: e.adelante.z };
+  }
+  update(dt, personaje) {
+    if (personaje) {
+      const e = this.ejes();
+      const dx = personaje.x - this.foco.x, dz = personaje.z - this.foco.z;
+      const dy = (personaje.y + 0.5) - this.foco.y;
+      // dónde cae en pantalla: el eje vertical mezcla profundidad y ALTURA
+      // (sin esto, el que vuela se sale por arriba y la cámara ni se entera)
+      const sh = (dx * e.derecha.x + dz * e.derecha.z) / this.anchoVista;
+      const sv = ((dx * e.adelante.x + dz * e.adelante.z) * Math.sin(this.pitch)
+                 + dy * Math.cos(this.pitch)) / this.altoVista;
+      if (Math.abs(sh) > 0.3 || Math.abs(sv) > 0.3) this.seguir = true;
+      if (this.seguir) {
+        const k = Math.min(1, dt * (this.prisa > 0 ? 8 : 2.4));
+        // lo deja un poco por debajo del centro (deja aire para la burbuja)
+        this.foco.x = lerp(this.foco.x, personaje.x + e.adelante.x * 1.6, k);
+        this.foco.z = lerp(this.foco.z, personaje.z + e.adelante.z * 1.6, k);
+        const objY = Math.max(PISO, personaje.y * 0.9 + PISO * 0.1);
+        this.foco.y = lerp(this.foco.y, objY, Math.min(1, dt * (this.prisa > 0 ? 6 : 1.9)));
+      }
+      this.prisa = Math.max(0, this.prisa - dt);
+    }
+    this.yawSuave = lerp(this.yawSuave, this.yaw, Math.min(1, dt * 6));
+    const z0 = this.zoomSuave;
+    this.zoomSuave = lerp(this.zoomSuave, this.zoom, Math.min(1, dt * 8));
+    if (Math.abs(z0 - this.zoomSuave) > 0.01) this.resize(this.aspecto);
+
+    const cf = Math.cos(this.pitch) * CAM_DIST, sy = Math.sin(this.pitch) * CAM_DIST;
+    this.cam.position.set(
+      this.foco.x + Math.sin(this.yawSuave) * cf,
+      this.foco.y + sy,
+      this.foco.z + Math.cos(this.yawSuave) * cf);
+    this.cam.lookAt(this.foco);
+  }
+}
+
+
+/* ============================================================
+   LA PTERA: vuelo con inercia y sustentación, alas de dos tramos
+   ============================================================ */
+const PT = {
+  cuerpo:'#9FBCCB', ala:'#8EAABC', alaClara:'#BDD3E0', vientre:'#F0E4D0',
+  cresta:'#E2916B', pico:'#EFD199', pata:'#C9A87C', tinta:'#3C3630'
+};
+// el planeo se define por velocidad de hundimiento, no por gravedad bruta:
+// volando rápido casi no baja; parada, cae como un paracaídas
+const HUNDE_RAPIDO = 0.42, HUNDE_PARADA = 2.0, SUBIDA_MAX = 5.8;
+const EMPUJE_ALETAZO = 30, DURA_ALETAZO = 0.18, ESPERA_ALETAZO = 0.34;
+const TECHO_VUELO = 24, VEL_CRUCERO = 7.2;
+
+class Ptera {
+  constructor(scene, nav, assets) {
+    this.nav = nav; this.assets = assets;
+    this.esPtera = true;
+    this.x = CASA.x + 2.2; this.z = CASA.z - 0.5;
+    this.y = ALTO_TEJADO;
+    this.ang = Math.PI * 0.8; this.angPrev = this.ang;
+    this.vel = VEL_CRUCERO;
+    this.vx = 0; this.vz = 0; this.vy = 0;
+    this.enSuelo = true;
+    this.mandoX = 0; this.mandoZ = 0; this.mandoM = 0;
+    this.forzarAng = null; this.cuello = null;
+    this.estado = 'quieto';
+    this.ruta = null; this.mueble = null; this.alLlegar = null; this.destino = null;
+    this.t = 0; this.fase = 1.2; this.impulso = 0;
+    this.empuje = 0; this.espera = 0; this.enfriamiento = 0;
+    this.giroVel = 0; this.alabeo = 0; this.aterrizando = 0;
+    this.gesto = 0; this.proxGesto = 4;
+    this.poseActual = 'de pie';
+    this.ojos = { cy: 0.58, cz: 0.42, oy: 0.1, oz: 0.36, giro: 1.4, cabeceo: 0.7 };
+    this.burbujas = new Map();
+    this.build(scene);
+  }
+
+  build(scene) {
+    const material = new THREE.MeshPhongMaterial({
+      map: this.assets.atlas, vertexColors: true,
+      specular: new THREE.Color('#2b2f33'), shininess: 26
+    });
+    const pieza = f => { const c = new Constructor(this.assets); f(c); return c.malla(material); };
+
+    this.raiz = new THREE.Group();
+    this.cuerpo = new THREE.Group();
+    this.raiz.add(this.cuerpo);
+
+    this.cuerpo.add(pieza(c => {
+      c.caja(0, 0.44, 0, 0.42, 0.36, 1.0, T.liso, PT.cuerpo, 0.32);
+      c.caja(0, 0.3, 0.05, 0.34, 0.16, 0.86, T.liso, PT.vientre, 0.32);
+    }));
+
+    // cabeza: cráneo, pico largo y cresta
+    this.cabeza = new THREE.Group();
+    this.cabeza.position.set(0, 0.58, 0.42);
+    this.cabeza.add(pieza(c => {
+      c.caja(0, 0.06, 0.06, 0.26, 0.26, 0.32, T.liso, PT.cuerpo, 0.28);
+      c.caja(0, 0.04, 0.34, 0.16, 0.14, 0.3, T.liso, PT.pico, 0.25);
+      c.caja(0, 0.02, 0.56, 0.1, 0.08, 0.2, T.liso, PT.pico, 0.22);
+      c.caja(0, 0.24, -0.16, 0.09, 0.34, 0.42, T.liso, PT.cresta, 0.3);
+      c.caja(0, 0.4, -0.02, 0.09, 0.16, 0.24, T.liso, PT.cresta, 0.25);
+      for (const l of [-1, 1]) c.caja(l * 0.12, 0.1, 0.16, 0.07, 0.08, 0.05, T.liso, PT.tinta, 0.2);
+    }));
+    this.cuerpo.add(this.cabeza);
+
+    // alas en dos tramos: hombro (brazo) y codo (membrana + punta)
+    this.alas = []; this.alasFuera = [];
+    for (const l of [-1, 1]) {
+      const hombro = new THREE.Group();
+      hombro.position.set(l * 0.19, 0.5, 0.04);
+      hombro.add(pieza(c => {
+        c.caja(l * 0.36, 0, 0.02, 0.66, 0.11, 0.28, T.liso, PT.ala, 0.32);
+        c.caja(l * 0.36, 0.02, 0.2, 0.6, 0.06, 0.16, T.liso, PT.alaClara, 0.28);
+      }));
+      const codo = new THREE.Group();
+      codo.position.set(l * 0.68, 0, 0);
+      codo.add(pieza(c => {
+        c.caja(l * 0.3, -0.01, -0.06, 0.56, 0.08, 0.52, T.liso, PT.alaClara, 0.32);
+        c.caja(l * 0.62, -0.02, -0.16, 0.26, 0.06, 0.34, T.liso, PT.ala, 0.28);
+        c.caja(l * 0.24, 0.02, 0.18, 0.5, 0.05, 0.14, T.liso, PT.alaClara, 0.26);
+      }));
+      hombro.add(codo);
+      this.cuerpo.add(hombro);
+      this.alas.push(hombro); this.alasFuera.push(codo);
+    }
+
+    // cola con su propio grupo (hace de timón)
+    this.cola = new THREE.Group();
+    this.cola.position.set(0, 0.46, -0.48);
+    this.cola.add(pieza(c => {
+      c.caja(0, 0, -0.16, 0.16, 0.14, 0.34, T.liso, PT.cuerpo, 0.28);
+      c.caja(0, 0.02, -0.4, 0.24, 0.06, 0.24, T.liso, PT.alaClara, 0.25);
+    }));
+    this.cuerpo.add(this.cola);
+
+    this.patas = [];
+    for (const l of [-1, 1]) {
+      const g = new THREE.Group();
+      g.position.set(l * 0.13, 0.3, -0.18);
+      g.add(pieza(c => {
+        c.caja(0, -0.15, 0, 0.09, 0.3, 0.09, T.liso, PT.pata, 0.25);
+        c.caja(0, -0.29, 0.04, 0.11, 0.06, 0.18, T.liso, PT.pata, 0.22);
+      }));
+      this.cuerpo.add(g); this.patas.push(g);
+    }
+
+    this.burbuja = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, depthTest: false, opacity: 0 }));
+    this.burbuja.scale.set(0.85, 0.85, 1);
+    this.burbuja.position.y = 1.4;
+    this.burbuja.renderOrder = 10;
+    this.raiz.add(this.burbuja);
+
+    scene.add(this.raiz);
+  }
+
+  emoji(e) {
+    if (!e) { this.burbuja.material.opacity = 0; return; }
+    if (!this.burbujas.has(e)) this.burbujas.set(e, this.assets.burbuja(e));
+    this.burbuja.material.map = this.burbujas.get(e);
+    this.burbuja.material.needsUpdate = true;
+    this.burbuja.material.opacity = 1;
+  }
+  pose() { this.poseActual = 'de pie'; }
+  mando(x, z, m) { this.mandoX = x; this.mandoZ = z; this.mandoM = m; if (m > 0.06) this.destino = null; }
+
+  // un aletazo empuja durante 0.18s, no de golpe: el arco sale limpio
+  saltar() {
+    if (this.espera > 0) return false;
+    this.espera = ESPERA_ALETAZO;
+    this.empuje = DURA_ALETAZO;
+    this.impulso = 1;
+    this.enSuelo = false;
+    return true;
+  }
+  get enfriamiento() { return this.espera; }
+  set enfriamiento(v) { this.espera = v; }
+
+  suelo(x, z) { return this.nav.altoTope(x === undefined ? this.x : x, z === undefined ? this.z : z); }
+  puedeIr(x, z) {
+    for (const o of [[0.3, 0], [-0.3, 0], [0, 0.3], [0, -0.3]])
+      if (this.nav.altoTope(x + o[0], z + o[1]) > this.y + 0.06) return false;
+    return true;
+  }
+  irA(x, z, alLlegar) {
+    this.destino = { x, z };
+    this.alLlegar = alLlegar || null;
+    this.estado = 'camina';
+    return true;
+  }
+  get velocidad() { return Math.hypot(this.vx, this.vz); }
+
+  update(dt) {
+    this.t += dt;
+    this.espera = Math.max(0, this.espera - dt);
+    const suelo = this.suelo();
+
+    /* ---- piloto automático ---- */
+    if (this.destino) {
+      const dx = this.destino.x - this.x, dz = this.destino.z - this.z, d = Math.hypot(dx, dz);
+      if (d < 1.2) {
+        this.destino = null; this.estado = 'quieto';
+        if (this.alLlegar) { const f = this.alLlegar; this.alLlegar = null; f(); }
+      } else {
+        this.mandoX = dx / d; this.mandoZ = dz / d; this.mandoM = 0.9;
+        if (this.y < suelo + 5) this.saltar();
+      }
+    }
+
+    /* ---- velocidad horizontal con inercia (lo que da la sensación de vuelo) ---- */
+    const enAire = !this.enSuelo;
+    if (this.mandoM > 0.06) {
+      this.estado = this.destino ? 'camina' : 'libre';
+      const objetivo = (this.enSuelo ? 2.2 : VEL_CRUCERO) * this.mandoM;
+      const k = Math.min(1, dt * (this.enSuelo ? 9 : 2.4));
+      this.vx += (this.mandoX * objetivo - this.vx) * k;
+      this.vz += (this.mandoZ * objetivo - this.vz) * k;
+    } else {
+      if (this.estado === 'libre') this.estado = 'quieto';
+      // en el aire conserva la inercia (sigue planeando), en el suelo frena
+      const roce = enAire ? 0.4 : 7;
+      const f = Math.max(0, 1 - dt * roce);
+      this.vx *= f; this.vz *= f;
+    }
+
+    // avanzar comprobando estorbos por separado en cada eje
+    const nx = this.x + this.vx * dt, nz = this.z + this.vz * dt;
+    if (this.puedeIr(nx, this.z)) this.x = nx; else this.vx *= -0.15;
+    if (this.puedeIr(this.x, nz)) this.z = nz; else this.vz *= -0.15;
+
+    /* ---- vertical: aletazo, sustentación y planeo ---- */
+    const vel = this.velocidad;
+    if (this.empuje > 0) {
+      this.vy += EMPUJE_ALETAZO * Math.min(dt, this.empuje);
+      this.empuje -= dt;
+      // el aletazo también empuja un poco hacia adelante
+      this.vx += Math.sin(this.ang) * 2.2 * dt;
+      this.vz += Math.cos(this.ang) * 2.2 * dt;
+      this.vy = Math.min(this.vy, SUBIDA_MAX);
+    }
+    if (!this.enSuelo) {
+      // cuanto más rápido vuela, menos baja
+      const sust = clamp(vel / VEL_CRUCERO, 0, 1);
+      const hundimiento = lerp(HUNDE_PARADA, HUNDE_RAPIDO, sust * sust);
+      this.vy += (-hundimiento - this.vy) * Math.min(1, dt * 1.9);
+      const techo = suelo + TECHO_VUELO;
+      if (this.y > techo - 3) this.vy = Math.min(this.vy, (techo - this.y) * 0.9);
+      this.y += this.vy * dt;
+      if (this.y <= suelo) {
+        this.y = suelo; this.vy = 0; this.enSuelo = true;
+        this.aterrizando = 0;
+      }
+    } else if (this.y > suelo + 0.3) {
+      this.enSuelo = false;                 // se quedó sin suelo debajo: a planear
+    } else {
+      this.y += (suelo - this.y) * Math.min(1, dt * 10);
+      this.vy = 0;
+    }
+    // preparar el aterrizaje: frena, abre las alas y saca las patas
+    const alturaSuelo = this.y - suelo;
+    const quiereAterrizar = !this.enSuelo && this.vy < 0 && alturaSuelo < 1.8;
+    this.aterrizando += ((quiereAterrizar ? 1 : 0) - this.aterrizando) * Math.min(1, dt * 7);
+
+    /* ---- orientación: mira hacia donde vuela, y se inclina al girar ---- */
+    if (vel > 0.4) {
+      const objetivo = Math.atan2(this.vx, this.vz);
+      let dif = objetivo - this.ang;
+      while (dif > Math.PI) dif -= Math.PI * 2;
+      while (dif < -Math.PI) dif += Math.PI * 2;
+      this.ang += dif * Math.min(1, dt * (this.enSuelo ? 8 : 4));
+    }
+    if (this.forzarAng !== null) {
+      let dif = this.forzarAng - this.ang;
+      while (dif > Math.PI) dif -= Math.PI * 2;
+      while (dif < -Math.PI) dif += Math.PI * 2;
+      this.ang += dif * Math.min(1, dt * 8);
+    }
+    let giro = this.ang - this.angPrev;
+    while (giro > Math.PI) giro -= Math.PI * 2;
+    while (giro < -Math.PI) giro += Math.PI * 2;
+    this.angPrev = this.ang;
+    this.giroVel += (giro / Math.max(dt, 1e-4) - this.giroVel) * Math.min(1, dt * 7);
+
+    this.animar(dt, vel);
+    this.raiz.position.set(this.x, this.y, this.z);
+    this.raiz.rotation.y = this.ang;
+    this.burbuja.position.y = 1.25 + Math.sin(this.t * 2.2) * 0.05;
+  }
+
+  animar(dt, vel) {
+    this.impulso *= Math.max(0, 1 - dt * 3.0);
+    const k = Math.min(1, dt * 8);
+    const sust = clamp(vel / VEL_CRUCERO, 0, 1);
+
+    if (this.enSuelo) {
+      /* --- posada: alas recogidas, algún estiramiento de vez en cuando --- */
+      this.proxGesto -= dt;
+      if (this.proxGesto <= 0) { this.gesto = 1.1; this.proxGesto = 5 + Math.random() * 7; }
+      const g = this.gesto > 0 ? Math.sin((1.1 - this.gesto) / 1.1 * Math.PI) : 0;
+      if (this.gesto > 0) this.gesto -= dt;
+      for (const i of [0, 1]) {
+        const l = i === 0 ? -1 : 1;                       // -1 izquierda, +1 derecha
+        const plegado = 1.15 - g * 0.5;                   // punta arriba, pegada al cuerpo
+        this.alas[i].rotation.z += (l * plegado - this.alas[i].rotation.z) * k;
+        this.alas[i].rotation.x += ((0.3 - g * 0.25) - this.alas[i].rotation.x) * k;
+        this.alasFuera[i].rotation.z += (-l * (1.5 - g * 1.1) - this.alasFuera[i].rotation.z) * k;
+      }
+      for (const pa of this.patas) pa.rotation.x += (0 - pa.rotation.x) * k;
+      this.cuerpo.rotation.x += (0 - this.cuerpo.rotation.x) * k;
+      this.cuerpo.position.y = Math.sin(this.t * 1.5) * 0.012 + g * 0.05;
+      this.cola.rotation.x += (-0.1 - this.cola.rotation.x) * k;
+    } else {
+      /* --- en el aire --- */
+      // el batido se acelera con el aletazo y se calma al planear
+      this.fase += dt * (2.0 + this.impulso * 9.5);
+      const sen = Math.sin(this.fase);
+      // bajada rápida y subida lenta, como un ala de verdad
+      const bat = Math.sign(sen) * Math.pow(Math.abs(sen), 0.7);
+      const amp = (0.24 + this.impulso * 0.6 + (1 - sust) * 0.12) * (1 - this.aterrizando * 0.5);
+      const batTarde = Math.sin(this.fase - 0.85);
+      const punta = Math.sign(batTarde) * Math.pow(Math.abs(batTarde), 0.7);
+
+      for (const i of [0, 1]) {
+        const l = i === 0 ? -1 : 1;
+        const diedro = 0.06 + this.aterrizando * 0.35;    // al aterrizar las abre más
+        this.alas[i].rotation.z = l * (diedro + bat * amp);
+        this.alas[i].rotation.x = 0.05 + bat * 0.1 + this.aterrizando * 0.25;
+        // la punta va con retraso respecto al brazo: efecto látigo
+        this.alasFuera[i].rotation.z = l * (punta * amp * 0.55 + this.aterrizando * 0.2);
+        this.alasFuera[i].rotation.x = punta * 0.08;
+      }
+      for (const pa of this.patas)
+        pa.rotation.x += ((1.15 - this.aterrizando * 1.25) - pa.rotation.x) * Math.min(1, dt * 6);
+      // morro arriba o abajo según suba o baje, y más levantado al aterrizar
+      const cabeceo = clamp(-this.vy * 0.06, -0.3, 0.28) - this.aterrizando * 0.3;
+      this.cuerpo.rotation.x += (cabeceo - this.cuerpo.rotation.x) * Math.min(1, dt * 6);
+      this.cuerpo.position.y = 0;
+      // cola de timón
+      this.cola.rotation.y += (clamp(-this.giroVel * 0.25, -0.5, 0.5) - this.cola.rotation.y) * Math.min(1, dt * 6);
+      this.cola.rotation.x += (clamp(this.vy * 0.06, -0.3, 0.3) - this.cola.rotation.x) * Math.min(1, dt * 5);
+    }
+
+    // se inclina en las curvas
+    this.alabeo += (clamp(-this.giroVel * 0.32, -0.75, 0.75) * (this.enSuelo ? 0 : 1) - this.alabeo) * Math.min(1, dt * 5);
+    this.cuerpo.rotation.z = this.alabeo;
+
+    /* --- cabeza: sigue la vista y se mantiene nivelada en las curvas --- */
+    if (this.cuello) {
+      let dy = this.cuello.yaw - this.raiz.rotation.y;
+      while (dy > Math.PI) dy -= Math.PI * 2;
+      while (dy < -Math.PI) dy += Math.PI * 2;
+      dy = clamp(dy, -this.ojos.giro, this.ojos.giro);
+      const dp = clamp(-this.cuello.pitch * 0.6, -this.ojos.cabeceo, this.ojos.cabeceo);
+      const kc = Math.min(1, dt * 16);
+      this.cabeza.rotation.y += (dy - this.cabeza.rotation.y) * kc;
+      this.cabeza.rotation.x += (dp - this.cabeza.rotation.x) * kc;
+    } else {
+      this.cabeza.rotation.y += (clamp(this.giroVel * 0.12, -0.5, 0.5) - this.cabeza.rotation.y) * Math.min(1, dt * 5);
+      this.cabeza.rotation.x += ((-this.cuerpo.rotation.x * 0.7 + Math.sin(this.t * 1.1) * 0.05) - this.cabeza.rotation.x) * Math.min(1, dt * 6);
+    }
+    // el cuello compensa el alabeo para llevar la cabeza derecha
+    this.cabeza.rotation.z += (-this.alabeo * 0.85 - this.cabeza.rotation.z) * Math.min(1, dt * 7);
+  }
+}
+
+/* ============================================================
+   CÁMARA EN PRIMERA PERSONA (a la altura de los ojos del gato)
+   ============================================================ */
+// el cuello pivota donde arranca la cabeza; los ojos van al frente del hocico
+const CUELLO = { y: 0.64, z: 0.52 };
+const OJO = { y: 0.14, z: 0.34 };
+const OJOS = CUELLO.y + OJO.y;        // 0.78 sobre el suelo
+const GIRO_CUELLO = 1.7;              // hasta ~97° a cada lado
+const CABECEO_CUELLO = 0.55;
+
+class CamaraPrimera {
+  constructor(aspecto) {
+    this.yaw = Math.PI; this.pitch = -0.06;
+    this.yawObj = this.yaw; this.pitchObj = this.pitch;
+    this.fovBase = 76;
+    this.cam = new THREE.PerspectiveCamera(this.fovBase, aspecto, 0.06, 400);
+    this.pos = new THREE.Vector3();
+    this.mira = new THREE.Vector3();
+    this.balanceo = 0; this.golpe = 0; this.vyPrev = 0; this.roll = 0;
+    this.enganchada = false;
+    this.resize(aspecto);
+  }
+  resize(aspecto) {
+    // en vertical hay que abrir el campo de visión o parece que miras por un tubo
+    this.cam.aspect = aspecto;
+    this.cam.fov = aspecto < 1 ? clamp(this.fovBase + (1 - aspecto) * 26, this.fovBase, 92) : this.fovBase;
+    this.cam.updateProjectionMatrix();
+  }
+  // sensibilidad relativa al ancho de pantalla: igual de cómodo en móvil y en monitor
+  mirar(dx, dy) {
+    const k = clamp(2.6 / innerWidth, 0.0016, 0.0085);
+    this.yawObj -= dx * k;
+    this.pitchObj = clamp(this.pitchObj - dy * k, -1.15, 1.2);
+  }
+  colocar(yaw, pitch) {
+    this.yaw = this.yawObj = yaw;
+    this.pitch = this.pitchObj = pitch;
+    this.enganchada = false;
+    this.golpe = 0; this.balanceo = 0; this.roll = 0;
+  }
+  ejes() {
+    const s = Math.sin(this.yaw), c = Math.cos(this.yaw);
+    return { adelante: { x: s, z: c }, derecha: { x: c, z: -s } };
+  }
+  dir() { return this.ejes().adelante; }
+
+  update(dt, gato) {
+    // la mirada se suaviza un poco: responde rápido pero no tiembla
+    const kv = Math.min(1, dt * 22);
+    this.yaw += (this.yawObj - this.yaw) * kv;
+    this.pitch += (this.pitchObj - this.pitch) * kv;
+
+    const e = this.ejes();
+    const base = gato.raiz.position;
+
+    const oj = gato.ojos || { cy: CUELLO.y, cz: CUELLO.z, oy: OJO.y, oz: OJO.z };
+    // 1) el cuello va donde lo lleva el cuerpo
+    const by = gato.raiz.rotation.y;
+    const cx = base.x + Math.sin(by) * oj.cz;
+    const cz = base.z + Math.cos(by) * oj.cz;
+    // 2) los ojos salen del cuello hacia donde mira la vista
+    let ox0 = cx + e.adelante.x * oj.oz;
+    let oz0 = cz + e.adelante.z * oj.oz;
+    // 3) si eso cae dentro de un muro o un mueble, se recoge hacia el cuerpo
+    const nav = gato.nav;
+    if (!gato.esPtera && nav.caminable(base.x, base.z) && !nav.caminable(ox0, oz0)) {
+      for (let t = 0.8; t >= 0; t -= 0.16) {
+        const nx = lerp(base.x, ox0, t), nz = lerp(base.z, oz0, t);
+        if (nav.caminable(nx, nz)) { ox0 = nx; oz0 = nz; break; }
+        if (t <= 0) { ox0 = base.x; oz0 = base.z; }
+      }
+    }
+
+    // cabeceo del trote (suave) y vaivén lateral
+    const anda = gato.estado === 'libre' || gato.estado === 'camina';
+    this.balanceo += dt * (anda ? 9.5 * Math.max(0.4, gato.mandoM || 1) : 0);
+    const bob = anda ? Math.sin(this.balanceo) * 0.016 : Math.sin(gato.t * 1.6) * 0.005;
+    const vaiven = anda ? Math.sin(this.balanceo * 0.5) * 0.022 : 0;
+
+    // amortiguación al aterrizar
+    if (gato.enSuelo && this.vyPrev < -4) this.golpe = Math.min(0.15, -this.vyPrev * 0.02);
+    this.vyPrev = gato.vy;
+    this.golpe *= Math.max(0, 1 - dt * 6);
+
+    const ox = ox0 + e.derecha.x * vaiven;
+    const oy = base.y + oj.cy + oj.oy + bob - this.golpe + (gato.cuerpo ? gato.cuerpo.position.y * 0.5 : 0);
+    const oz = oz0 + e.derecha.z * vaiven;
+
+    if (!this.enganchada) { this.pos.set(ox, oy, oz); this.enganchada = true; }
+    // horizontal casi inmediato; vertical más lento para que los escalones no den tirones
+    this.pos.x += (ox - this.pos.x) * Math.min(1, dt * 26);
+    this.pos.z += (oz - this.pos.z) * Math.min(1, dt * 26);
+    this.pos.y += (oy - this.pos.y) * Math.min(1, dt * (gato.enSuelo ? 11 : 24));
+    this.cam.position.set(this.pos.x, this.pos.y, this.pos.z);
+
+    const cp = Math.cos(this.pitch), sp = Math.sin(this.pitch);
+    this.mira.set(this.pos.x + e.adelante.x * cp, this.pos.y + sp, this.pos.z + e.adelante.z * cp);
+
+    // si el bicho se inclina al girar (la ptera), la cámara se inclina con él
+    const banco = (gato.alabeo || 0) * 0.45;
+    this.roll += (banco - this.roll) * Math.min(1, dt * 5);
+    if (Math.abs(this.roll) > 0.002) {
+      const fx = e.adelante.x * cp, fy = sp, fz = e.adelante.z * cp;
+      const cr = Math.cos(this.roll), sr = Math.sin(this.roll);
+      // up girado alrededor del eje de visión
+      this.cam.up.set(fz * sr / cp, cr, -fx * sr / cp);
+    } else if (this.cam.up.y !== 1) {
+      this.cam.up.set(0, 1, 0);
+    }
+    this.cam.lookAt(this.mira);
+  }
+}
+
+/* ============================================================
+   AMBIENTE: cielo, sol, luces y luciérnagas
+   ============================================================ */
+class Ambiente {
+  constructor(scene, assets) {
+    this.scene = scene;
+    this.solBlanco = new THREE.Color('#FFF6E4');
+    this.solNaranja = new THREE.Color('#FFBE8A');
+    this.solLuna = new THREE.Color('#9FB3D9');
+    this.rellDia = new THREE.Color('#DCE9F5');
+    this.rellTarde = new THREE.Color('#F0D8C4');
+    this.rellNoche = new THREE.Color('#B9C9E8');
+    this.colDia = new THREE.Color('#CBE7F3');
+    this.colTarde = new THREE.Color('#F3B183');
+    this.colNoche = new THREE.Color('#2E3A57');
+    this.colAlba = new THREE.Color('#F6CBB6');
+    this.cielo = new THREE.Color();
+
+    scene.fog = new THREE.Fog(0xCBE7F3, CAM_DIST + 18, CAM_DIST + 78);
+
+    this.hemi = new THREE.HemisphereLight(0xE8F4FA, 0x9DBF95, 0.5);
+    scene.add(this.hemi);
+    this.sol = new THREE.DirectionalLight(0xFFF3DC, 0.7);
+    this.sol.castShadow = true;
+    this.sol.shadow.mapSize.set(ES_MOVIL ? 1024 : 2048, ES_MOVIL ? 1024 : 2048);
+    const c = this.sol.shadow.camera;
+    c.left = -34; c.right = 34; c.top = 34; c.bottom = -34; c.near = 1; c.far = 200;
+    this.sol.shadow.bias = -0.0005;
+    this.sol.shadow.normalBias = 0.06;
+    this.sol.shadow.radius = 2.5;                 // bordes suaves (con PCFSoft)
+    scene.add(this.sol, this.sol.target);
+
+    // relleno desde el lado contrario: evita que las caras en sombra queden muertas
+    this.relleno = new THREE.DirectionalLight(0xD8E6F2, 0.2);
+    this.blanco = new THREE.Object3D();
+    scene.add(this.relleno, this.blanco);
+    this.relleno.target = this.blanco;
+
+    // luciérnagas
+    const N = 110, pos = [], rnd = mulberry32(7);
+    this.semillas = [];
+    for (let i = 0; i < N; i++) {
+      const a = rnd() * Math.PI * 2, r = 12 + rnd() * 34;
+      const x = Math.cos(a) * r, z = Math.sin(a) * r;
+      pos.push(x, PISO + 0.6 + rnd() * 2.2, z);
+      this.semillas.push({ x, z, f: 0.4 + rnd() * 0.9, p: rnd() * 6.28 });
+    }
+    // estrellas en una cúpula alrededor del jugador
+    const ep = [], rnd2 = mulberry32(31);
+    for (let i = 0; i < 480; i++) {
+      const u = rnd2(), a = rnd2() * Math.PI * 2, r = Math.sqrt(1 - u * u);
+      ep.push(Math.cos(a) * r * 240, 30 + u * 210, Math.sin(a) * r * 240);
+    }
+    const eg = new THREE.BufferGeometry();
+    eg.setAttribute('position', new THREE.Float32BufferAttribute(ep, 3));
+    this.estrellas = new THREE.Points(eg, new THREE.PointsMaterial({
+      color: 0xFFF6E0, size: 1.7, sizeAttenuation: false,
+      transparent: true, opacity: 0, depthWrite: false, fog: false
+    }));
+    scene.add(this.estrellas);
+
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    this.luces = new THREE.Points(g, new THREE.PointsMaterial({
+      map: assets.chispa, size: 0.55, transparent: true, opacity: 0,
+      depthWrite: false, blending: THREE.AdditiveBlending, fog: false
+    }));
+    scene.add(this.luces);
+
+    /* ---- nubes: van con el jugador para que el cielo nunca se quede vacío ---- */
+    const rn = mulberry32(505);
+    this.nubes = [];
+    for (let i = 0; i < (ES_MOVIL ? 9 : 15); i++) {
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: assets.nube, transparent: true, opacity: 0, depthWrite: false, fog: false
+      }));
+      const w = 26 + rn() * 30;
+      sp.scale.set(w, w * 0.42, 1);
+      sp.renderOrder = -2;
+      sp.userData = {
+        x: (rn() - 0.5) * 320, z: (rn() - 0.5) * 320,
+        y: 38 + rn() * 26, v: 0.7 + rn() * 1.1, a: 0.5 + rn() * 0.45
+      };
+      scene.add(sp);
+      this.nubes.push(sp);
+    }
+
+    /* ---- mariposas: las del día, para que el jardín no esté quieto ---- */
+    const NM = ES_MOVIL ? 16 : 26, mp = [], rnm = mulberry32(3131);
+    this.mariposas = [];
+    for (let i = 0; i < NM; i++) {
+      const a = rnm() * Math.PI * 2, r = 8 + rnm() * 30;
+      const x = Math.cos(a) * r, z = Math.sin(a) * r;
+      mp.push(x, PISO + 1, z);
+      this.mariposas.push({ x, z, f: 0.5 + rnm() * 1.1, p: rnm() * 6.28, alto: 0.7 + rnm() * 1.6 });
+    }
+    const mg = new THREE.BufferGeometry();
+    mg.setAttribute('position', new THREE.Float32BufferAttribute(mp, 3));
+    this.alas = new THREE.Points(mg, new THREE.PointsMaterial({
+      map: assets.chispa, color: 0xFFF1F4, size: 0.42, transparent: true, opacity: 0,
+      depthWrite: false, fog: true
+    }));
+    scene.add(this.alas);
+
+    /* ---- humo de la chimenea (sprites sueltos: cada uno se apaga a su ritmo) ---- */
+    this.humo = [];
+    const rh = mulberry32(77);
+    for (let i = 0; i < (ES_MOVIL ? 10 : 16); i++) {
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: assets.mota, color: 0xF2EFE8, transparent: true, opacity: 0,
+        depthWrite: false, fog: true
+      }));
+      sp.visible = false;
+      scene.add(sp);
+      this.humo.push({ sp, t: rh() * 3.2, dur: 3.4 + rh() * 1.8, giro: rh() * 6.28, desvio: 0.5 + rh() * 0.8 });
+    }
+    this.chimenea = null;
+
+    /* ---- lluvia: gotas alrededor del jugador, se reciclan al llegar abajo ---- */
+    // OJO: un Points dibuja siempre un CUADRADO, así que la raya de lluvia tiene que ir
+    // pintada dentro de una textura cuadrada; si no, se estira y queda un punto borroso.
+    const gc = document.createElement('canvas');
+    gc.width = gc.height = 32;
+    const gg = gc.getContext('2d');
+    const lin = gg.createLinearGradient(0, 0, 0, 32);
+    lin.addColorStop(0, 'rgba(226,242,252,0)');
+    lin.addColorStop(0.25, 'rgba(226,242,252,.95)');
+    lin.addColorStop(0.75, 'rgba(226,242,252,.95)');
+    lin.addColorStop(1, 'rgba(226,242,252,0)');
+    gg.fillStyle = lin;
+    gg.fillRect(12, 0, 8, 32);
+    const gotaTex = new THREE.CanvasTexture(gc);
+
+    const NG = ES_MOVIL ? 320 : 620, gp = [], rg = mulberry32(4242);
+    this.gotas = [];
+    for (let i = 0; i < NG; i++) {
+      const x = (rg() - 0.5) * 56, y = rg() * 26, z = (rg() - 0.5) * 56;
+      gp.push(x, y, z);
+      this.gotas.push({ x, y, z, v: 14 + rg() * 9 });
+    }
+    const gge = new THREE.BufferGeometry();
+    gge.setAttribute('position', new THREE.Float32BufferAttribute(gp, 3));
+    this.agua = new THREE.Points(gge, new THREE.PointsMaterial({
+      map: gotaTex, color: 0xF2F9FF, size: 2.4, transparent: true, opacity: 0,
+      depthWrite: false, fog: true
+    }));
+    this.agua.visible = false;
+    scene.add(this.agua);
+    this.lluvia = 0;        // 0 seco, 1 diluvio
+    this.lluviaObj = 0;     // a dónde va
+    this.proxLluvia = 90 + Math.random() * 240;   // segundos hasta la próxima
+  }
+
+  // la casa se construye después que el ambiente: aquí le decimos dónde echa humo
+  humoDesde(v) { this.chimenea = v ? v.clone() : null; }
+
+  update(dt, hora, foco, zoom, primera) {
+    // ---- el tiempo que hace: nubes que tapan el sol y chubascos de vez en cuando ----
+    const th = performance.now() / 1000;
+    // dos senos que no casan = nubosidad irregular, como si pasaran nubes de verdad
+    const nubosidad = 0.5 + 0.5 * Math.sin(th * 0.043) * Math.sin(th * 0.017 + 1.3);
+    this.proxLluvia -= dt;
+    if (this.proxLluvia <= 0) {
+      if (this.lluviaObj > 0.1) {                        // se acaba el chubasco
+        this.lluviaObj = 0;
+        this.proxLluvia = 150 + Math.random() * 420;
+      } else if (nubosidad > 0.45) {                     // solo llueve si está nublado
+        this.lluviaObj = 0.55 + Math.random() * 0.45;
+        this.proxLluvia = 45 + Math.random() * 70;
+      } else {
+        this.proxLluvia = 30;
+      }
+    }
+    this.lluvia += (this.lluviaObj - this.lluvia) * (1 - Math.exp(-0.55 * dt));
+    const mojado = this.lluvia;
+    this.dbgMojado = mojado;
+
+    const ang = (hora - 6) / 12 * Math.PI;              // 6h sale, 18h se pone
+    const elev = Math.sin(ang);
+    const dir = new THREE.Vector3(Math.cos(ang) * 0.85, Math.max(elev, -0.4), 0.42).normalize();
+
+    const dia = sstep(-0.10, 0.30, elev);
+    const noche = 1 - dia;
+    const rojizo = sstep(0.45, 0.01, Math.abs(elev)) * sstep(-0.28, 0.02, elev);
+    this.noche = noche;
+
+    this.cielo.copy(this.colNoche).lerp(this.colDia, dia);
+    const tarde = hora > 12 ? this.colTarde : this.colAlba;
+    this.cielo.lerp(tarde, rojizo * 0.75);
+    // día de lluvia: el cielo se apaga y tira a gris
+    if (mojado > 0.01) this.cielo.lerp(new THREE.Color('#8FA3AE'), mojado * 0.55 * dia);
+    this.scene.background = this.cielo;
+    this.scene.fog.color.copy(this.cielo);
+    if (primera) { this.scene.fog.near = 16; this.scene.fog.far = 115; }
+    else { this.scene.fog.near = CAM_DIST + 30 + zoom * 0.25; this.scene.fog.far = CAM_DIST + 125 + zoom * 1.8; }
+
+    this.hemi.intensity = 0.18 + dia * 0.26;
+    this.hemi.color.copy(this.cielo).lerp(new THREE.Color('#FFFFFF'), 0.45);
+
+    // sol y luna sin saltos: la luz nunca viene de debajo del suelo y la
+    // intensidad es el máximo de las dos curvas, así no hay parpadeo al anochecer
+    // una nube tapando el sol baja la luz y la lluvia la baja más
+    const tapado = 1 - nubosidad * 0.28 - mojado * 0.35;
+    const luzSol = (0.18 + dia * 0.5 + rojizo * 0.16) * tapado;
+    this.sol.intensity = Math.max(0.2 * noche, luzSol);
+    this.sol.color.copy(this.solBlanco).lerp(this.solNaranja, rojizo).lerp(this.solLuna, sstep(0.55, 0.95, noche));
+    const d = dir.clone();
+    if (d.y < 0.2) { d.y = 0.2; d.normalize(); }
+    this.dirLuz = d;
+    this.sol.position.copy(foco).addScaledVector(d, 70);
+    this.sol.target.position.copy(foco);
+    this.sol.target.updateMatrixWorld();
+
+    // el relleno viene de enfrente y desde arriba, y de noche es azulado
+    this.relleno.intensity = 0.1 + dia * 0.13 + noche * 0.05;
+    this.relleno.color.copy(this.rellDia).lerp(this.rellTarde, rojizo * 0.8).lerp(this.rellNoche, sstep(0.5, 0.9, noche));
+    this.relleno.position.copy(foco).addScaledVector(d, -45);
+    this.relleno.position.y = foco.y + 42;
+    this.blanco.position.copy(foco);
+    this.blanco.updateMatrixWorld();
+
+    this.estrellas.position.set(foco.x, 0, foco.z);
+    this.estrellas.material.opacity = sstep(0.4, 0.9, noche) * 0.9;
+
+    // luciérnagas: solo de noche, flotando
+    const t = performance.now() / 1000;
+    const p = this.luces.geometry.attributes.position;
+    for (let i = 0; i < this.semillas.length; i++) {
+      const s = this.semillas[i];
+      p.array[i * 3] = s.x + Math.sin(t * s.f + s.p) * 1.4;
+      p.array[i * 3 + 1] = PISO + 0.7 + Math.sin(t * s.f * 1.7 + s.p * 2) * 0.8 + (i % 5) * 0.28;
+      p.array[i * 3 + 2] = s.z + Math.cos(t * s.f * 0.8 + s.p) * 1.4;
+    }
+    p.needsUpdate = true;
+    this.luces.material.opacity = sstep(0.35, 0.8, noche) * (0.55 + Math.sin(t * 2) * 0.12);
+
+    // mariposas: de día, revoloteando a saltitos (el seno al cubo da el aleteo)
+    const mpos = this.alas.geometry.attributes.position;
+    for (let i = 0; i < this.mariposas.length; i++) {
+      const s = this.mariposas[i];
+      const fase = t * s.f + s.p;
+      mpos.array[i * 3] = s.x + Math.sin(fase) * 2.6 + Math.sin(fase * 0.37) * 1.6;
+      mpos.array[i * 3 + 1] = PISO + s.alto + Math.pow(Math.sin(fase * 2.2), 3) * 0.55;
+      mpos.array[i * 3 + 2] = s.z + Math.cos(fase * 0.8) * 2.6 + Math.cos(fase * 0.29) * 1.6;
+    }
+    mpos.needsUpdate = true;
+    this.alas.material.opacity = dia * 0.75 * (0.7 + Math.sin(t * 6.5) * 0.3);
+
+    // nubes: se mueven despacio y dan la vuelta alrededor del jugador
+    for (const sp of this.nubes) {
+      const u = sp.userData;
+      u.x += u.v * dt;
+      const rel = u.x - foco.x;
+      if (rel > 170) u.x -= 340; else if (rel < -170) u.x += 340;
+      let relz = u.z - foco.z;
+      if (relz > 170) { u.z -= 340; relz -= 340; } else if (relz < -170) { u.z += 340; relz += 340; }
+      sp.position.set(u.x, u.y, u.z);
+      sp.material.opacity = u.a * (0.25 + dia * 0.6);
+      sp.material.color.setRGB(1, 1, 1).lerp(this.cielo, 0.25 + rojizo * 0.45);
+    }
+
+    // humo: sube, se abre y se disuelve; luego vuelve a empezar en la chimenea
+    // lluvia: las gotas caen y vuelven arriba; la caja va con el jugador
+    if (mojado > 0.02) {
+      this.agua.visible = true;
+      const q = this.agua.geometry.attributes.position;
+      for (let i = 0; i < this.gotas.length; i++) {
+        const gd = this.gotas[i];
+        gd.y -= gd.v * dt;
+        if (gd.y < -2) { gd.y += 28; gd.x = (Math.random() - 0.5) * 56; gd.z = (Math.random() - 0.5) * 56; }
+        q.array[i * 3] = foco.x + gd.x;
+        q.array[i * 3 + 1] = PISO + gd.y;
+        q.array[i * 3 + 2] = foco.z + gd.z;
+      }
+      q.needsUpdate = true;
+      this.agua.material.opacity = mojado * 0.75;
+    } else if (this.agua.visible) {
+      this.agua.visible = false;
+    }
+    // con lluvia no salen ni mariposas ni luciérnagas
+    this.alas.material.opacity *= (1 - mojado);
+    this.luces.material.opacity *= (1 - mojado * 0.7);
+
+    if (this.chimenea) {
+      for (const h of this.humo) {
+        h.t += dt;
+        if (h.t > h.dur) h.t -= h.dur;
+        const k = h.t / h.dur;                       // 0 recién salido, 1 disuelto
+        const sube = k * 7.2;
+        const abre = 0.7 + k * 3.2;                  // se va abriendo al subir
+        h.sp.visible = true;
+        h.sp.position.set(
+          this.chimenea.x + Math.sin(h.giro + k * 2.4) * h.desvio * k * 2.4 + k * 1.6,
+          this.chimenea.y + sube,
+          this.chimenea.z + Math.cos(h.giro + k * 2.0) * h.desvio * k * 2.0
+        );
+        h.sp.scale.set(abre, abre, 1);
+        // entra rápido y se va lento; de noche se ve menos
+        h.sp.material.opacity = Math.min(k * 7, 1) * (1 - k) * (0.85 - noche * 0.3);
+      }
+    }
+    return noche;
+  }
+}
+
+
+/* ============================================================
+   SONIDO (dos toques suaves, nada más)
+   ============================================================ */
+class Sonido {
+  init() {
+    if (this.ctx) return;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (AC) this.ctx = new AC();
+  }
+  nota(freq, dur, vol, tipo) {
+    if (!this.ctx) return;
+    if (this.ctx.state === 'suspended') this.ctx.resume();
+    const t = this.ctx.currentTime;
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = tipo || 'sine';
+    o.frequency.setValueAtTime(freq, t);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(this.ctx.destination);
+    o.start(t); o.stop(t + dur + 0.02);
+  }
+  toque() { this.nota(520, 0.09, 0.06, 'sine'); }
+  campanita() { this.nota(660, 0.18, 0.07); setTimeout(() => this.nota(880, 0.22, 0.05), 90); }
+
+  /* ---- ambiente: viento siempre, pájaros de día, grillos de noche ----
+     Todo sintetizado: la página va sin archivos de audio (y la CSP del sitio
+     donde vive no dejaría cargarlos de fuera de todos modos). */
+  ambiente() {
+    if (!this.ctx || this.amb) return;
+    const ctx = this.ctx;
+    this.amb = ctx.createGain();
+    this.amb.gain.value = 0;                       // entra despacito
+    this.amb.connect(ctx.destination);
+    this.amb.gain.linearRampToValueAtTime(1, ctx.currentTime + 3);
+
+    // viento = ruido rosa barato pasado por un filtro que se mueve solo
+    const seg = 2;
+    const buf = ctx.createBuffer(1, ctx.sampleRate * seg, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    let last = 0;
+    for (let i = 0; i < d.length; i++) {
+      const blanco = Math.random() * 2 - 1;
+      last = (last + 0.02 * blanco) / 1.02;
+      d[i] = last * 3.5;
+    }
+    const src = ctx.createBufferSource();
+    src.buffer = buf; src.loop = true;
+    const filtro = ctx.createBiquadFilter();
+    filtro.type = 'lowpass'; filtro.frequency.value = 420;
+    this.vientoG = ctx.createGain();
+    this.vientoG.gain.value = 0.05;
+    src.connect(filtro); filtro.connect(this.vientoG); this.vientoG.connect(this.amb);
+    src.start();
+    // rachas: el filtro y el volumen respiran
+    this.vientoT = setInterval(() => {
+      if (!this.ctx) return;
+      const t = this.ctx.currentTime, r = Math.random();
+      this.vientoG.gain.linearRampToValueAtTime(0.028 + r * 0.05, t + 4);
+      filtro.frequency.linearRampToValueAtTime(300 + r * 380, t + 4);
+    }, 4200);
+
+    // lluvia: el mismo ruido pero por arriba, que es como suena el agua
+    const src2 = ctx.createBufferSource();
+    src2.buffer = buf; src2.loop = true;
+    const alto = ctx.createBiquadFilter();
+    alto.type = 'highpass'; alto.frequency.value = 1100;
+    this.lluviaG = ctx.createGain();
+    this.lluviaG.gain.value = 0;
+    src2.connect(alto); alto.connect(this.lluviaG); this.lluviaG.connect(this.amb);
+    src2.start();
+
+    this.bichos = setInterval(() => this.bicho(), 1500);
+  }
+  lluvia(v) {
+    if (!this.lluviaG || !this.ctx) return;
+    const obj = Math.min(v, 1) * 0.16;
+    if (Math.abs(this.lluviaG.gain.value - obj) < 0.004) return;
+    this.lluviaG.gain.linearRampToValueAtTime(obj, this.ctx.currentTime + 0.8);
+  }
+  // un pío de día o un grillo de noche, a ratos y nunca dos iguales seguidos
+  bicho() {
+    if (!this.ctx || this.mute || this.noche === undefined) return;
+    if (Math.random() > (this.noche > 0.6 ? 0.55 : 0.35)) return;
+    const t = this.ctx.currentTime;
+    if (this.noche > 0.6) {
+      // grillo: pulsos cortos y agudos
+      const n = 3 + Math.floor(Math.random() * 3);
+      for (let i = 0; i < n; i++) {
+        const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+        o.type = 'triangle';
+        o.frequency.value = 2350 + Math.random() * 260;
+        const t0 = t + i * 0.085;
+        g.gain.setValueAtTime(0.0001, t0);
+        g.gain.exponentialRampToValueAtTime(0.014, t0 + 0.006);
+        g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.05);
+        o.connect(g); g.connect(this.amb || this.ctx.destination);
+        o.start(t0); o.stop(t0 + 0.07);
+      }
+    } else {
+      // pájaro: dos o tres notas que suben
+      const base = 1500 + Math.random() * 900;
+      const n = 2 + Math.floor(Math.random() * 2);
+      for (let i = 0; i < n; i++) {
+        const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+        o.type = 'sine';
+        const t0 = t + i * 0.11;
+        o.frequency.setValueAtTime(base * (1 + i * 0.18), t0);
+        o.frequency.exponentialRampToValueAtTime(base * (1.25 + i * 0.2), t0 + 0.08);
+        g.gain.setValueAtTime(0.0001, t0);
+        g.gain.exponentialRampToValueAtTime(0.02, t0 + 0.012);
+        g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.13);
+        o.connect(g); g.connect(this.amb || this.ctx.destination);
+        o.start(t0); o.stop(t0 + 0.16);
+      }
+    }
+  }
+  silenciarAmbiente(si) {
+    if (!this.amb || !this.ctx) return;
+    this.amb.gain.linearRampToValueAtTime(si ? 0.0001 : 1, this.ctx.currentTime + 0.4);
+  }
+  mudo(si) {
+    this.mute = si;
+    this.silenciarAmbiente(si);
+  }
+}
+
+/* ============================================================
+   JOYSTICK (analógico, con zona muerta)
+   ============================================================ */
+class Joystick {
+  constructor(zona, base) {
+    this.zona = zona; this.base = base;
+    this.perilla = base && base.querySelector ? base.querySelector('i') : null;
+    this.x = 0; this.y = 0; this.m = 0; this.id = null;
+    this.cx = 0; this.cy = 0; this.radio = 52;
+    if (!zona || !zona.addEventListener) return;
+    zona.addEventListener('pointerdown', e => {
+      e.preventDefault();
+      this.id = e.pointerId;
+      if (zona.setPointerCapture) zona.setPointerCapture(e.pointerId);
+      this.colocar(e);
+      if (base.classList) base.classList.add('on');
+      this.mover(e);
+    });
+    zona.addEventListener('pointermove', e => { if (e.pointerId === this.id) this.mover(e); });
+    const soltar = e => {
+      if (this.id !== null && e.pointerId !== this.id) return;
+      this.id = null; this.x = this.y = this.m = 0;
+      if (base.classList) base.classList.remove('on');
+      if (this.perilla) this.perilla.style.transform = 'translate(0px, 0px)';
+      // la base vuelve a su esquina
+      base.style.left = ''; base.style.top = ''; base.style.bottom = '';
+    };
+    zona.addEventListener('pointerup', soltar);
+    zona.addEventListener('pointercancel', soltar);
+  }
+  caja(el, porDefecto) {
+    return el && el.getBoundingClientRect ? el.getBoundingClientRect() : porDefecto;
+  }
+  // la base salta a donde has puesto el dedo (dentro de su esquina)
+  colocar(e) {
+    const rz = this.caja(this.zona, { left: 0, top: 0, width: 230, height: 230 });
+    const rb = this.caja(this.base, { width: 124, height: 124 });
+    const R = (rb.width || 124) / 2;
+    this.radio = R - 10;
+    const x = clamp(e.clientX - rz.left, R + 4, Math.max(R + 4, rz.width - R - 4));
+    const y = clamp(e.clientY - rz.top, R + 4, Math.max(R + 4, rz.height - R - 4));
+    if (this.base.style) {
+      this.base.style.left = (x - R) + 'px';
+      this.base.style.top = (y - R) + 'px';
+      this.base.style.bottom = 'auto';
+    }
+    this.cx = rz.left + x; this.cy = rz.top + y;
+  }
+  mover(e) {
+    let dx = e.clientX - this.cx, dy = e.clientY - this.cy;
+    const lim = this.radio;
+    const d = Math.hypot(dx, dy);
+    if (d > lim) { dx *= lim / d; dy *= lim / d; }
+    if (this.perilla) this.perilla.style.transform = 'translate(' + dx.toFixed(1) + 'px,' + dy.toFixed(1) + 'px)';
+    const zona = 0.12;
+    const mag = Math.min(1, Math.hypot(dx, dy) / lim);
+    if (mag < zona) { this.x = this.y = this.m = 0; return; }
+    const util = (mag - zona) / (1 - zona);
+    const ang = Math.atan2(dy, dx);
+    this.x = Math.cos(ang) * util;
+    this.y = Math.sin(ang) * util;
+    this.m = util;
+  }
+}
+
+/* ============================================================
+   JUEGO
+   ============================================================ */
+const DECAE = { energia: 0.20, hambre: 0.28, diversion: 0.34 };
+const NOMBRE_NEED = { energia: 'Energía', hambre: 'Hambre', diversion: 'Diversión' };
+
+class Juego {
+  constructor() {
+    this.lienzo = document.getElementById('lienzo');
+    this.renderer = new THREE.WebGLRenderer({
+      canvas: this.lienzo, antialias: !ES_MOVIL, powerPreference: 'high-performance'
+    });
+    this.renderer.setPixelRatio(Math.min(devicePixelRatio, ES_MOVIL ? 1.6 : 2));
+    this.renderer.setSize(innerWidth, innerHeight);
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = ES_MOVIL ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
+    if (ES_TACTIL) document.body.classList.add('tactil');
+
+    // la ayuda de teclas no le sirve de nada a quien juega con el dedo
+    if (ES_TACTIL) {
+      document.getElementById('tips').innerHTML =
+        '<b>Toca</b> el suelo para ir andando<br>' +
+        '<b>Arrastra</b> a la izquierda para el mando<br>' +
+        '<b>Arrastra</b> la vista &nbsp; <b>pellizca</b> para el zoom<br>' +
+        '<b>Toca</b> un mueble para usarlo';
+    }
+
+    this.scene = new THREE.Scene();
+    this.assets = new Assets();
+    this.world = new World(this.scene, this.assets, 20260729);
+    this.world.prepare();
+    this.camara = new CamaraIso(innerWidth / innerHeight);
+    this.cam1 = new CamaraPrimera(innerWidth / innerHeight);
+    this.vista = 'iso';
+    this.ambiente = new Ambiente(this.scene, this.assets);
+    this.sonido = new Sonido();
+    this.ray = new THREE.Raycaster();
+
+    this.necesidades = { energia: 74, hambre: 62, diversion: 68 };
+    this.tiempo = 0;
+    this.pausa = false;
+    this.cargando = true;
+    this.teclas = new Set();
+    this.frames = 0; this.acum = 0;
+    this.shaderAgua = true;
+    this.lento = 0;
+
+    // marcador de destino
+    const anillo = new THREE.Mesh(new THREE.RingGeometry(0.32, 0.46, 22),
+      new THREE.MeshBasicMaterial({ color: 0xFFFFFF, transparent: true, opacity: 0, depthWrite: false }));
+    anillo.rotation.x = -Math.PI / 2;
+    this.scene.add(anillo);
+    this.anillo = anillo;
+
+    this.dom = {
+      barra: document.querySelector('#barra i'),
+      entrar: document.getElementById('entrar'),
+      inicio: document.getElementById('inicio'),
+      hora: document.getElementById('hora'),
+      dia: document.getElementById('dia'),
+      estado: document.getElementById('estado'),
+      pausado: document.getElementById('pausado'),
+      fps: document.getElementById('fps'),
+      nuevaPartida: document.getElementById('denuevo'),
+      needs: {}
+    };
+    document.querySelectorAll('.need').forEach(el => {
+      this.dom.needs[el.dataset.need] = { el, fill: el.querySelector('.fill') };
+    });
+
+    this.joy = new Joystick(document.getElementById('joyzona'), document.getElementById('joy'));
+    this.eventos();
+    this.ultimo = performance.now();
+    this.bucle = this.bucle.bind(this);
+    requestAnimationFrame(this.bucle);
+  }
+
+  get camActiva() { return this.vista === 'primera' ? this.cam1.cam : this.camara.cam; }
+
+  cambiarVista() {
+    if (this.cargando) return;
+    if (this.vista === 'iso') {
+      this.vista = 'primera';
+      this.cam1.colocar(this.camara.yawSuave + Math.PI, -0.06);   // seguir mirando al mismo lado
+      document.body.classList.add('vista1a');
+      this.texto(ES_TACTIL ? 'Vista de gato · arrastra para mirar' : 'Vista de gato · clic para capturar el ratón');
+    } else {
+      this.vista = 'iso';
+      const paso = Math.PI / 2;
+      this.camara.yaw = Math.round((this.cam1.yaw - Math.PI) / paso) * paso;
+      this.camara.yawSuave = this.camara.yaw;
+      this.camara.seguir = true;
+      // pegar el foco al gato para no entrar deslizándose desde lejos
+      if (this.persona) this.camara.foco.set(this.persona.x, PISO, this.persona.z);
+      this.persona.forzarAng = null;
+      this.persona.cuello = null;
+      document.body.classList.remove('vista1a');
+      this.soltarRaton();
+      this.texto('Vista isométrica');
+    }
+    this.pintarBotones();
+    setTimeout(() => this.texto(''), 2600);
+  }
+
+  /* ---------------- carga ---------------- */
+  cargar() {
+    const faltan = this.world.stream(ES_MOVIL ? 8 : 12);
+    this.dom.barra.style.width = (100 * (1 - faltan / this.world.total)).toFixed(0) + '%';
+    if (faltan) return;
+    this.casa = new Casa(this.scene, this.assets);
+    this.casa.manzanos(this.world);
+    this.casa.muelle(this.world);
+    this.ambiente.humoDesde(this.casa.chimenea);
+    this.nav = new Nav();
+    this.nav.construir(this.world, this.casa);
+    this.gato = new Personaje(this.scene, this.nav, this.assets);
+    this.ptera = new Ptera(this.scene, this.nav, this.assets);
+    this.persona = this.gato;
+    this.camara.foco.set(this.persona.x, PISO, this.persona.z);
+    this.cargando = false;
+    this.dom.entrar.disabled = false;
+    this.partida = this.leerPartida();
+    if (this.partida) {
+      this.dom.entrar.textContent = 'Continuar · Día ' + this.partida.d;
+      this.dom.nuevaPartida.style.display = 'block';
+    } else {
+      this.dom.entrar.textContent = 'Entrar';
+    }
+  }
+
+  /* ---------------- se guarda sola ---------------- */
+  leerPartida() {
+    try {
+      const raw = localStorage.getItem('casita_partida');
+      if (!raw) return null;
+      const p = JSON.parse(raw);
+      if (typeof p.t !== 'number' || !p.n) return null;
+      p.d = 1 + Math.floor((HORA_INICIO + p.t / DAY_LENGTH * 24) / 24);
+      return p;
+    } catch (e) { return null; }
+  }
+  guardarPartida() {
+    if (this.cargando || !this.persona) return;
+    try {
+      localStorage.setItem('casita_partida', JSON.stringify({
+        t: this.tiempo,
+        n: this.necesidades,
+        x: this.gato.x, z: this.gato.z,
+        v: 2   // versión del formato, por si algún día cambia
+      }));
+    } catch (e) {}
+  }
+  restaurarPartida() {
+    const p = this.partida;
+    if (!p) return;
+    this.tiempo = p.t;
+    for (const k in this.necesidades)
+      if (typeof p.n[k] === 'number') this.necesidades[k] = clamp(p.n[k], 0, 100);
+    if (typeof p.x === 'number' && typeof p.z === 'number' && this.nav) {
+      const x = clamp(p.x, -ISLA_R, ISLA_R), z = clamp(p.z, -ISLA_R, ISLA_R);
+      this.gato.x = x; this.gato.z = z; this.gato.y = this.nav.altura(x, z);
+      this.gato.raiz.position.set(x, this.gato.y, z);
+      this.camara.foco.set(x, PISO, z);
+    }
+    this.texto('Bienvenido de vuelta · Día ' + p.d);
+    setTimeout(() => this.texto(''), 3600);
+  }
+  olvidarPartida() {
+    try { localStorage.removeItem('casita_partida'); } catch (e) {}
+    this.partida = null;
+    this.dom.entrar.textContent = 'Entrar';
+    this.dom.nuevaPartida.style.display = 'none';
+  }
+
+  /* ---------------- interacciones ---------------- */
+  texto(t) {
+    this.dom.estado.textContent = t;
+    this.dom.estado.classList.toggle('on', !!t);
+  }
+  // la chuleta de controles se aparta sola cuando ya la has leído, y vuelve con "?"
+  ayudaAlDejarla() {
+    const btn = document.getElementById('ayuda');
+    const ocultar = () => document.body.classList.add('ayuda-oculta');
+    clearTimeout(this._ayudaT);
+    this._ayudaT = setTimeout(ocultar, 15000);
+    if (this._ayudaLista) return;
+    this._ayudaLista = true;
+    btn.addEventListener('click', () => {
+      const oculta = document.body.classList.toggle('ayuda-oculta');
+      clearTimeout(this._ayudaT);
+      if (!oculta) this._ayudaT = setTimeout(ocultar, 15000);
+    });
+  }
+  // en el iPhone, desde Safari, se ve mucho mejor añadido a la pantalla de inicio
+  avisoPantallaInicio() {
+    const el = document.getElementById('alinicio');
+    const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+                (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const suelta = navigator.standalone === true ||
+                   (matchMedia && matchMedia('(display-mode: standalone)').matches);
+    let visto = false;
+    try { visto = localStorage.getItem('casita_aviso_inicio') === '1'; } catch (e) {}
+    if (!iOS || suelta || visto) return;
+    el.innerHTML = 'Compartir → <b>Añadir a pantalla de inicio</b><br>y se ve a pantalla completa';
+    setTimeout(() => el.classList.add('on'), 5200);
+    const fuera = () => {
+      el.classList.remove('on');
+      try { localStorage.setItem('casita_aviso_inicio', '1'); } catch (e) {}
+    };
+    el.addEventListener('click', fuera);
+    setTimeout(fuera, 14000);
+  }
+  usar(m) {
+    if (m.tipo === 'huerto' || m.tipo === 'manzano' || m.tipo === 'pesca') return this.usarFuera(m);
+    this.parar(true);
+    this.sonido.toque();
+    this.camara.seguir = true;
+    this.texto('Va a ' + m.verbo.toLowerCase() + '…');
+    this.persona.irA(m.anclaX, m.anclaZ, () => {
+      const p = this.persona;
+      p.ang = m.mirar;
+      p.estado = 'usando';
+      p.mueble = m;
+      p.pose(m.pose);
+      p.emoji(m.emoji);
+      this.casa.teleOn = m.nombre === 'Tele';
+      this.sonido.campanita();
+      this.texto(m.emoji + '  ' + m.accion.charAt(0).toUpperCase() + m.accion.slice(1));
+    }, m);
+  }
+  parar(silencio) {
+    if (!this.persona) return;
+    const p = this.persona;
+    p.estado = 'quieto'; p.mueble = null; p.alLlegar = null; p.ruta = null;
+    p.pose('de pie'); p.emoji(null);
+    if (this.casa) this.casa.teleOn = false;
+    if (!silencio) this.texto('');
+  }
+
+  clic(px, py) {
+    if (this.cargando || this.pausa || !this.persona) return;
+    const ndc = new THREE.Vector2((px / innerWidth) * 2 - 1, -(py / innerHeight) * 2 + 1);
+    this.ray.setFromCamera(ndc, this.camActiva);
+
+    const grupos = this.casa.muebles.map(m => m.grupo);
+    const golpes = this.persona.esPtera ? [] : this.ray.intersectObjects(grupos, true);
+    if (golpes.length) {
+      let o = golpes[0].object;
+      while (o && !o.userData.mueble) o = o.parent;
+      if (o) { this.usar(o.userData.mueble); return; }
+    }
+
+    const r = this.world.raycast(this.ray.ray.origin, this.ray.ray.direction, 300);
+    if (!r) return;
+    const dx = r.x + 0.5, dz = r.z + 0.5;
+    if (this.recoger && this.recoger()) return;      // si hay caña echada, el toque la recoge
+    const cerca = this.persona.esPtera ? null : this.casa.muebleCerca(dx, dz, ES_TACTIL ? 0.7 : 0.1);
+    if (cerca) { this.usar(cerca); return; }
+    if (!this.persona.esPtera) this.parar();
+    this.camara.seguir = true;                       // si le mando ir, lo acompaño
+    if (this.persona.irA(dx, dz)) {
+      this.sonido.toque();
+      this.anillo.position.set(dx, this.nav.altura(dx, dz) + 0.04, dz);
+      this.anillo.material.opacity = 0.9;
+    }
+  }
+
+  /* ---------------- entradas ---------------- */
+  eventos() {
+    const cv = this.lienzo;
+    const punteros = new Map();
+    let movido = 0, ultX = 0, ultY = 0, boton = 0, pinch0 = 0, zoom0 = 0;
+    const dist = () => {
+      const v = [...punteros.values()];
+      return Math.hypot(v[0].x - v[1].x, v[0].y - v[1].y);
+    };
+
+    cv.addEventListener('pointerdown', e => {
+      cv.setPointerCapture && cv.setPointerCapture(e.pointerId);
+      punteros.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (punteros.size === 2) { pinch0 = dist(); zoom0 = this.camara.zoom; }
+      movido = 0; ultX = e.clientX; ultY = e.clientY; boton = e.button;
+    });
+    cv.addEventListener('pointermove', e => {
+      // con el ratón capturado (1ª persona en PC) se mira sin pulsar nada
+      if (this.raton) { this.cam1.mirar(e.movementX || 0, e.movementY || 0); return; }
+      if (!punteros.has(e.pointerId)) return;
+      punteros.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (punteros.size === 2) {
+        const d = dist();
+        if (pinch0 > 10) this.camara.zoom = clamp(zoom0 * pinch0 / d, 11, 50);
+        movido = 999;
+        return;
+      }
+      const dx = e.clientX - ultX, dy = e.clientY - ultY;
+      ultX = e.clientX; ultY = e.clientY;
+      movido += Math.abs(dx) + Math.abs(dy);
+      if (movido <= 8) return;                       // aún puede ser un clic
+      if (!document.body.classList.contains('arrastrando')) document.body.classList.add('arrastrando');
+
+      if (this.vista === 'primera') { this.cam1.mirar(dx, dy); return; }
+      if (boton === 2) this.camara.girarLibre(-dx * 0.006);      // derecho: girar
+      else {                                                      // izquierdo o dedo: mover la vista
+        const k = this.camara.altoVista / innerHeight;
+        this.camara.pan(-dx * k, dy * k);
+      }
+    });
+    const soltar = e => {
+      if (!punteros.has(e.pointerId)) return;
+      punteros.delete(e.pointerId);
+      document.body.classList.remove('arrastrando');
+      if (movido < 8 && boton !== 2) {
+        if (this.raton) this.clic(innerWidth / 2, innerHeight / 2);          // mirilla
+        else if (this.vista === 'primera' && !ES_TACTIL) this.capturarRaton();
+        else this.clic(e.clientX, e.clientY);
+      }
+      if (punteros.size < 2) pinch0 = 0;
+    };
+    cv.addEventListener('pointerup', soltar);
+    cv.addEventListener('pointercancel', e => {
+      punteros.delete(e.pointerId);
+      if (document.body.classList) document.body.classList.remove('arrastrando');
+    });
+    cv.addEventListener('contextmenu', e => e.preventDefault());
+    addEventListener('wheel', e => this.camara.zoomear(e.deltaY > 0 ? 1.12 : 0.89), { passive: true });
+
+    addEventListener('keydown', e => {
+      this.teclas.add(e.code);
+      if (e.repeat) return;
+      if (e.code === 'KeyQ') this.camara.girar(-1);
+      if (e.code === 'KeyE') this.camara.girar(1);
+      if (e.code === 'KeyF') { this.camara.seguir = true; }
+      if (e.code === 'KeyR') this.alternarTecho();
+      if (e.code === 'KeyV') this.cambiarVista();
+      if (e.code === 'KeyC') this.cambiarPersonaje();
+      if (e.code === 'KeyG') this.alternarAgua();
+      if (e.code === 'Escape') this.parar();
+      if (e.code === 'Space') { e.preventDefault(); this.saltar(); }
+      if (e.code === 'KeyP') this.alternarPausa();
+      if (e.code === 'KeyM' && this.alternarMudo) this.alternarMudo();
+      if (e.code === 'KeyO') this.modoFoto();
+    });
+    addEventListener('keyup', e => this.teclas.delete(e.code));
+    addEventListener('blur', () => this.teclas.clear());
+
+    document.getElementById('pausa').addEventListener('click', () => this.alternarPausa());
+    const btnMudo = document.getElementById('mudo');
+    this.alternarMudo = () => {
+      const si = !this.sonido.mute;
+      this.sonido.mudo(si);
+      btnMudo.textContent = si ? '🔇' : '♪';
+      btnMudo.classList.toggle('off', si);
+      try { localStorage.setItem('casita_mudo', si ? '1' : '0'); } catch (e) {}
+    };
+    btnMudo.addEventListener('click', this.alternarMudo);
+    try { if (localStorage.getItem('casita_mudo') === '1') this.alternarMudo(); } catch (e) {}
+    const bSalto = document.getElementById('saltar');
+    if (bSalto) {
+      const suelta = () => { this.botonSalto = false; };
+      bSalto.addEventListener('pointerdown', e => {
+        e.preventDefault();
+        // capturar el puntero: si no, mover el dedo un milímetro cortaba el aleteo
+        if (bSalto.setPointerCapture) bSalto.setPointerCapture(e.pointerId);
+        this.botonSalto = true;
+        this.saltar();
+      });
+      bSalto.addEventListener('pointerup', suelta);
+      bSalto.addEventListener('pointercancel', suelta);
+      addEventListener('pointerup', suelta);          // por si se suelta fuera del botón
+      addEventListener('blur', suelta);
+    }
+    this.dom.botones = {};
+    document.querySelectorAll('#dock .mini').forEach(b => {
+      this.dom.botones[b.dataset.accion] = b;
+      // pointerdown responde antes que click: se siente inmediato
+      b.addEventListener('pointerdown', e => {
+        e.preventDefault();
+        vibrar(8);
+        const a = b.dataset.accion;
+        if (a === 'izq') this.camara.girar(-1);
+        else if (a === 'der') this.camara.girar(1);
+        else if (a === 'centrar') { this.camara.seguir = true; this.camara.zoom = clamp(this.camara.zoom, 11, 30); }
+        else if (a === 'techo') this.alternarTecho();
+        else if (a === 'vista') this.cambiarVista();
+        else if (a === 'cambiar') this.cambiarPersonaje();
+        else if (a === 'foto') this.modoFoto();
+        this.pintarBotones();
+      });
+    });
+    this.pintarBotones();
+    this.dom.entrar.addEventListener('click', () => {
+      if (this.cargando) return;
+      this.sonido.init();
+      this.dom.inicio.classList.add('ir');
+      document.body.classList.add('jugando');
+      if (this.partida) this.restaurarPartida();
+      else {
+        this.texto(ES_TACTIL ? 'Toca para caminar · arrastra la vista · pellizca para el zoom'
+                             : 'Un día tranquilo en la isla');
+        setTimeout(() => this.texto(''), 4200);
+      }
+      this.ayudaAlDejarla();
+      this.avisoPantallaInicio();
+      this.sonido.ambiente();
+    });
+    this.dom.nuevaPartida.addEventListener('click', () => this.olvidarPartida());
+
+    // guardar sola: al poco de entrar, cada 15 s, y siempre que la pestaña se va a segundo plano
+    setTimeout(() => this.guardarPartida(), 3000);
+    setInterval(() => this.guardarPartida(), 15000);
+    addEventListener('pagehide', () => this.guardarPartida());
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        this.guardarPartida();
+        this.enSegundoPlano = this.pausa;   // recordar si ya estaba en pausa a mano
+        this.pausa = true;
+        this.dom.pausado.classList.add('on');
+        this.sonido.silenciarAmbiente(true);
+      } else if (!this.enSegundoPlano) {
+        // volver sin dar un salto de tiempo: el reloj no corre mientras no miras
+        this.ultimo = performance.now();
+        this.pausa = false;
+        this.dom.pausado.classList.remove('on');
+        this.sonido.silenciarAmbiente(false);
+      }
+    });
+    document.addEventListener('pointerlockchange', () => {
+      this.raton = document.pointerLockElement === cv;
+      if (document.body.classList) document.body.classList.toggle('raton', this.raton);
+      this.texto(this.raton ? 'Ratón capturado · Esc para soltarlo'
+                            : (this.vista === 'primera' ? 'Clic para volver a mirar' : ''));
+      setTimeout(() => { if (this.dom.estado.textContent.indexOf('atón') >= 0 || this.dom.estado.textContent.indexOf('mirar') >= 0) this.texto(''); }, 2400);
+    });
+
+    const reencuadrar = () => {
+      this.renderer.setSize(innerWidth, innerHeight);
+      this.camara.resize(innerWidth / innerHeight);
+      this.cam1.resize(innerWidth / innerHeight);
+    };
+    addEventListener('resize', reencuadrar);
+    addEventListener('orientationchange', () => setTimeout(reencuadrar, 250));
+    // el navegador no debe hacer zoom ni recargar al arrastrar
+    for (const ev of ['gesturestart', 'gesturechange', 'dblclick'])
+      document.addEventListener(ev, e => e.preventDefault(), { passive: false });
+  }
+
+  saltar() {
+    if (this.cargando || this.pausa || !this.persona) return;
+    if (this.persona.estado === 'usando') this.parar();
+    this.camara.seguir = true;
+    if (this.persona.saltar()) this.sonido.nota(760, 0.07, 0.05, 'triangle');
+  }
+
+  // lee joystick + WASD y lo pasa a coordenadas del mundo según el giro de la cámara
+  leerMando() {
+    // en primera persona el cuello sigue a la cámara aunque no te muevas
+    if (this.persona)
+      this.persona.cuello = this.vista === 'primera' ? { yaw: this.cam1.yaw, pitch: this.cam1.pitch } : null;
+    let jx = 0, jy = 0;
+    if (this.joy && this.joy.m > 0) { jx = this.joy.x; jy = -this.joy.y; }
+    const t = this.teclas;
+    if (t.has('KeyW')) jy += 1;
+    if (t.has('KeyS')) jy -= 1;
+    if (t.has('KeyD')) jx += 1;
+    if (t.has('KeyA')) jx -= 1;
+    let m = Math.hypot(jx, jy);
+    if (m > 1) { jx /= m; jy /= m; m = 1; }
+    if (m < 0.06) {
+      this.persona.mando(0, 0, 0);
+      if (this.vista === 'primera') this.persona.forzarAng = null;
+      return 0;
+    }
+    const e = (this.vista === 'primera' ? this.cam1 : this.camara).ejes();
+    this.persona.mando(e.derecha.x * jx + e.adelante.x * jy,
+                       e.derecha.z * jx + e.adelante.z * jy, m);
+    if (this.vista === 'primera') this.persona.forzarAng = this.cam1.yaw;
+    return m;
+  }
+
+  cambiarPersonaje() {
+    if (this.cargando) return;
+    const antes = this.persona;
+    antes.cuello = null;
+    antes.forzarAng = null;
+    antes.mando(0, 0, 0);
+    this.persona = antes === this.gato ? this.ptera : this.gato;
+    const p = this.persona;
+    this.camara.seguir = true;
+    this.camara.prisa = 0.65;                    // llega deslizándose rápido, sin saltar
+    if (this.vista === 'primera') this.cam1.colocar(p.ang, -0.05);
+    this.pintarBotones();
+    this.sonido.campanita();
+    this.texto(p.esPtera ? '🦅  La ptera · mantén ALETEO para subir' : '🐈  El gato');
+    setTimeout(() => this.texto(''), 2800);
+  }
+
+  pintarBotones() {
+    const b = this.dom.botones || {};
+    const poner = (accion, icono, texto, activo) => {
+      const el = b[accion];
+      if (!el || !el.querySelector) return;
+      const i = el.querySelector('b'), t = el.querySelector('i');
+      if (i) i.textContent = icono;
+      if (t) t.textContent = texto;
+      if (el.classList) el.classList.toggle('on', !!activo);
+    };
+    const p = this.persona, esP = !!(p && p.esPtera);
+    poner('vista', this.vista === 'primera' ? '🐾' : '👁', this.vista === 'primera' ? '1ª' : '3ª', this.vista === 'primera');
+    poner('cambiar', esP ? '🦅' : '🐈', esP ? 'ptera' : 'gato', false);
+    const t = this.casa ? this.casa.techoManual : null;
+    poner('techo', '⌂', t === null ? 'auto' : (t ? 'sin' : 'con'), t !== null);
+    poner('centrar', '◎', this.camara.seguir ? 'sigue' : 'libre', this.camara.seguir);
+    const bs = document.getElementById('saltar');
+    if (bs && bs.querySelector) {
+      const et = bs.querySelector('b');
+      if (et) et.textContent = esP ? 'ALETEO' : 'SALTO';
+    }
+  }
+
+  capturarRaton() {
+    const cv = this.lienzo;
+    if (ES_TACTIL || !cv.requestPointerLock) return;
+    try { const r = cv.requestPointerLock(); if (r && r.catch) r.catch(() => {}); } catch (e) {}
+  }
+  soltarRaton() {
+    try { if (document.exitPointerLock) document.exitPointerLock(); } catch (e) {}
+  }
+
+  alternarAgua(forzar) {
+    this.shaderAgua = forzar !== undefined ? forzar : !this.shaderAgua;
+    this.world.usarShaderAgua(this.shaderAgua);
+    this.texto(this.shaderAgua ? 'Agua con shader' : 'Agua sencilla (más rápida)');
+    setTimeout(() => this.texto(''), 2200);
+    return this.shaderAgua;
+  }
+
+  alternarTecho() {
+    const c = this.casa;
+    if (!c) return;
+    c.techoManual = c.techoManual === null ? true : (c.techoManual ? false : null);
+    this.texto(c.techoManual === null ? 'Techo automático' : (c.techoManual ? 'Techo quitado' : 'Techo puesto'));
+    this.pintarBotones();
+  }
+
+  alternarPausa() {
+    if (this.cargando) return;
+    this.pausa = !this.pausa;
+    this.dom.pausado.classList.toggle('on', this.pausa);
+    document.getElementById('pausa').textContent = this.pausa ? '▶' : '❚❚';
+  }
+
+  /* ---------------- simulación ---------------- */
+  necesidadesTick(dt) {
+    const n = this.necesidades;
+    for (const k in DECAE) n[k] = clamp(n[k] - DECAE[k] * dt, 0, 100);
+
+    const p = this.gato;                       // los muebles son cosa del gato
+    if (p.estado === 'usando' && p.mueble) {
+      const m = p.mueble;
+      n[m.need] = clamp(n[m.need] + m.tasa * dt, 0, 100);
+      if (m.need2) n[m.need2] = clamp(n[m.need2] + m.tasa2 * dt, 0, 100);
+      if (n[m.need] >= 99.9) {
+        this.parar(true);
+        this.texto('Listo ✨');
+        setTimeout(() => { if (this.dom.estado.textContent === 'Listo ✨') this.texto(''); }, 2200);
+      }
+    }
+    // cansado = camina más lento
+    this.gato.vel = n.energia < 18 ? 2.0 : 3.2;
+  }
+
+  // modo foto: se va la interfaz, entran las bandas y queda solo la isla
+  modoFoto() {
+    const on = document.body.classList.toggle('foto');
+    if (on) this.texto('');
+    return on;
+  }
+
+  /* ---------------- huerto y manzanos ---------------- */
+  usarFuera(m) {
+    this.parar(true);
+    this.sonido.toque();
+    this.camara.seguir = true;
+    this.texto('Va ' + (m.tipo === 'huerto' ? 'al huerto…' : 'al manzano…'));
+    this.persona.irA(m.anclaX, m.anclaZ, () => {
+      const p = this.persona;
+      p.ang = Math.atan2(m.x - p.x, m.z - p.z);
+      if (m.tipo === 'manzano') this.cogerManzana(m);
+      else if (m.tipo === 'pesca') this.pescar(m);
+      else this.tocarParcela(m);
+    });
+  }
+
+  /* ---- pescar: se echa el corcho, se espera, y cuando pica se recoge ---- */
+  pescar(m) {
+    const p = this.persona;
+    if (this.pescando) return;
+    this.pescando = { m, t: 0, espera: 3 + Math.random() * 5, pica: 0 };
+    m.corcho.visible = true;
+    p.emoji('🎣');
+    this.texto('Tirando el sedal…');
+  }
+  pescaTick(dt) {
+    const s = this.pescando;
+    if (!s) return;
+    const m = s.m, p = this.persona;
+    // si te vas andando, se acabó la pesca
+    if (Math.hypot(p.x - m.anclaX, p.z - m.anclaZ) > 3.2) {
+      m.corcho.visible = false; this.pescando = null; p.emoji(null); this.texto('');
+      return;
+    }
+    s.t += dt;
+    const y = SEA_LEVEL + 1.02;
+    if (s.pica > 0) {
+      s.pica -= dt;
+      // el corcho da tirones
+      m.corcho.position.y = y - 0.28 + Math.abs(Math.sin(s.t * 22)) * 0.22;
+      if (s.pica <= 0) {                      // se te escapó
+        m.corcho.visible = false; this.pescando = null; p.emoji('💨');
+        this.texto('Se ha soltado…');
+        setTimeout(() => { p.emoji(null); this.texto(''); }, 2200);
+      }
+    } else {
+      m.corcho.position.y = y + Math.sin(s.t * 1.7) * 0.06;
+      if (s.t > s.espera) {
+        s.pica = 2.6;                          // ventana para recoger
+        this.sonido.campanita();
+        p.emoji('❗');
+        this.texto('¡Pica! Toca para recoger');
+      }
+    }
+  }
+  // se llama al tocar mientras hay caña echada
+  recoger() {
+    const s = this.pescando;
+    if (!s) return false;
+    const p = this.persona;
+    if (s.pica > 0) {
+      const peces = ['🐟', '🐠', '🦐', '🐡'];
+      s.m.corcho.visible = false;
+      this.pescando = null;
+      this.sonido.campanita();
+      p.emoji(peces[Math.floor(Math.random() * peces.length)]);
+      this.necesidades.hambre = clamp(this.necesidades.hambre + 22, 0, 100);
+      this.necesidades.diversion = clamp(this.necesidades.diversion + 18, 0, 100);
+      this.texto('¡Uno para la cena!');
+      setTimeout(() => { p.emoji(null); this.texto(''); }, 2800);
+    } else {
+      this.texto('Todavía no pica… paciencia');
+    }
+    return true;
+  }
+
+  cogerManzana(m) {
+    const p = this.persona;
+    if (!m.maduro) {
+      p.emoji('⏳');
+      this.texto('Todavía no hay manzanas aquí');
+      setTimeout(() => { p.emoji(null); this.texto(''); }, 2200);
+      return;
+    }
+    m.maduro = false;
+    m.espera = 95 + Math.random() * 70;      // vuelven a salir solas
+    m.frutas.visible = false;
+    this.sonido.campanita();
+    p.emoji('🍎');
+    this.necesidades.hambre = clamp(this.necesidades.hambre + 18, 0, 100);
+    this.necesidades.diversion = clamp(this.necesidades.diversion + 6, 0, 100);
+    this.texto('🍎  Una manzana. Está buenísima');
+    setTimeout(() => { p.emoji(null); this.texto(''); }, 2800);
+  }
+
+  tocarParcela(m) {
+    const p = this.persona;
+    if (m.estado === 0) {                     // tierra vacía: sembrar
+      m.estado = 1; m.crece = 0;
+      this.sonido.toque();
+      p.emoji('🌱');
+      this.texto('🌱  Sembrado. Ahora hay que regar y esperar');
+    } else if (m.estado === 3) {              // maduro: cosechar
+      m.estado = 0; m.crece = 0; m.regada = 0;
+      this.sonido.campanita();
+      p.emoji('🍅');
+      this.necesidades.hambre = clamp(this.necesidades.hambre + 26, 0, 100);
+      this.necesidades.diversion = clamp(this.necesidades.diversion + 14, 0, 100);
+      this.texto('🍅  ¡Cosechado! Lo de uno sabe mejor');
+    } else {                                  // creciendo: regar
+      m.regada = 55;
+      this.sonido.toque();
+      p.emoji('💧');
+      this.texto('💧  Regado. Así crece el doble de rápido');
+    }
+    this.pintarParcela(m);
+    setTimeout(() => { p.emoji(null); this.texto(''); }, 2600);
+  }
+
+  pintarParcela(m) {
+    for (let e = 0; e < 3; e++) m.etapas[e].visible = (m.estado - 1 === e);
+  }
+
+  huertoTick(dt) {
+    if (!this.casa || !this.casa.parcelas) return;
+    const llueve = this.ambiente.lluvia > 0.25;
+    for (const m of this.casa.parcelas) {
+      if (m.estado === 0 || m.estado === 3) continue;
+      if (m.regada > 0) m.regada -= dt;
+      // sin agua va lento; regada o lloviendo, al doble
+      const vel = (m.regada > 0 || llueve) ? 1 : 0.42;
+      m.crece += dt * vel / 26;               // ~26 s por etapa bien regada
+      if (m.crece >= 1) {
+        m.crece = 0;
+        m.estado++;
+        this.pintarParcela(m);
+        if (m.estado === 3) {
+          this.texto('🍅  Ya hay algo listo en el huerto');
+          setTimeout(() => { if (this.dom.estado.textContent.indexOf('huerto') >= 0) this.texto(''); }, 3200);
+        }
+      }
+    }
+    for (const a of this.casa.arboles || []) {
+      if (a.maduro) continue;
+      a.espera -= dt;
+      if (a.espera <= 0) { a.maduro = true; a.frutas.visible = true; }
+    }
+  }
+
+  pintarUI(hora) {
+    for (const k in this.necesidades) {
+      const v = this.necesidades[k], d = this.dom.needs[k];
+      if (!d) continue;
+      d.fill.style.width = v.toFixed(1) + '%';
+      d.fill.style.background = v > 55 ? '#9DBF95' : (v > 25 ? '#F0C97A' : '#E88C86');
+      d.el.classList.toggle('low', v < 25);
+      d.el.title = NOMBRE_NEED[k] + ': ' + Math.round(v);
+    }
+    const h = Math.floor(hora), m = Math.floor((hora - h) * 60);
+    this.dom.hora.textContent = String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
+    this.dom.dia.textContent = 'Día ' + (1 + Math.floor((HORA_INICIO + this.tiempo / DAY_LENGTH * 24) / 24));
+  }
+
+  bucle(now) {
+    requestAnimationFrame(this.bucle);
+    let dt = (now - this.ultimo) / 1000;
+    this.ultimo = now;
+    dt = Math.min(dt, 0.1);
+
+    if (this.cargando) { this.cargar(); }
+
+    const corre = !this.cargando && !this.pausa;
+    if (corre) {
+      this.tiempo += dt;
+      // la ptera puede mantener el aleteo para ganar altura
+      if (this.persona.esPtera && (this.botonSalto || this.teclas.has('Space'))) this.saltar();
+      const mando = this.leerMando();
+      if (mando > 0.06) {
+        if (this.persona.estado === 'usando') this.parar();
+        this.camara.seguir = true;
+      }
+      this.gato.update(dt);
+      this.ptera.update(dt);
+      this.necesidadesTick(dt);
+      this.huertoTick(dt);
+      this.pescaTick(dt);
+      this.anillo.material.opacity = Math.max(0, this.anillo.material.opacity - dt * 0.8);
+    }
+
+    // paneo con flechas / WASD
+    const v = this.camara.zoomSuave * 0.55 * dt;
+    const t = this.teclas;
+    if (t.has('ArrowUp')) this.camara.pan(0, v);
+    if (t.has('ArrowDown')) this.camara.pan(0, -v);
+    if (t.has('ArrowLeft')) this.camara.pan(-v, 0);
+    if (t.has('ArrowRight')) this.camara.pan(v, 0);
+
+    const primera = this.vista === 'primera';
+    if (primera) { if (this.persona) this.cam1.update(dt, this.persona); }
+    else this.camara.update(dt, this.persona);
+
+    const horaTot = HORA_INICIO + this.tiempo / DAY_LENGTH * 24;
+    const hora = ((horaTot % 24) + 24) % 24;
+    const foco = primera && this.persona ? this.persona.raiz.position : this.camara.foco;
+    const noche = this.ambiente.update(dt, hora, foco, this.camara.zoomSuave, primera);
+    this.sonido.noche = noche;   // los grillos salen cuando se hace de noche
+    const llueve = this.ambiente.lluvia;
+    this.sonido.lluvia(llueve);
+    if (llueve > 0.3 && !this.avisoLluvia) {
+      this.avisoLluvia = true;
+      this.texto('Se ha puesto a llover ☂');
+      setTimeout(() => { if (this.dom.estado.textContent.indexOf('llover') >= 0) this.texto(''); }, 3800);
+    } else if (llueve < 0.08 && this.avisoLluvia) {
+      this.avisoLluvia = false;
+      this.texto('Ha escampado');
+      setTimeout(() => { if (this.dom.estado.textContent === 'Ha escampado') this.texto(''); }, 3000);
+    }
+    if (this.casa)
+      this.casa.actualizar(dt, primera ? this.cam1.dir() : this.camara.dir(), this.persona, noche, !primera);
+
+    // la sombra sigue al zoom
+    const d = primera ? 18 : clamp(this.camara.zoomSuave * 1.15, 16, 50);
+    const sc = this.ambiente.sol.shadow.camera;
+    if (Math.abs(sc.right - d) > 0.6) {
+      sc.left = -d; sc.right = d; sc.top = d; sc.bottom = -d;
+      sc.updateProjectionMatrix();
+    }
+
+    this.assets.waterTex.offset.y = (this.tiempo * 0.025) % 1;
+    this.world.actualizarAgua(this.tiempo, this.ambiente);
+    if (!this.cargando) this.pintarUI(hora);
+
+    this.renderer.render(this.scene, this.camActiva);
+
+    this.acumUI = (this.acumUI || 0) + dt;
+    if (this.acumUI > 0.35 && !this.cargando) { this.acumUI = 0; this.pintarBotones(); }
+
+    this.frames++; this.acum += dt;
+    if (this.acum >= 0.6) {
+      const fps = Math.round(this.frames / this.acum);
+      this.dom.fps.textContent = fps + ' fps';
+      // si el aparato va justo, el agua baja sola a la versión sencilla
+      if (!this.cargando && this.shaderAgua) {
+        this.lento = fps < 24 ? this.lento + this.acum : 0;
+        if (this.lento > 3.5) { this.alternarAgua(false); this.lento = 0; }
+      }
+      this.frames = 0; this.acum = 0;
+    }
+  }
+}
+
+window.addEventListener('load', () => {
+  if (typeof THREE === 'undefined') {
+    document.getElementById('entrar').textContent = 'No cargó Three.js';
+    return;
+  }
+  window.juego = new Juego();   // a mano para depurar desde la consola
+});
+</script>
+</body>
+</html>
