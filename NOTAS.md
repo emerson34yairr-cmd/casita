@@ -56,6 +56,42 @@ antialias, usa sombras baratas y reduce nubes, humo, mariposas y gotas de lluvia
 - **El muro de teclas de PC en el móvil** era lo que más afeaba: ahora la ayuda depende del
   aparato, se aparta sola a los 15 s y vuelve con el botón `?`.
 
+## Hasta dónde aguanta la isla (medido, 2 de agosto de 2026)
+
+En `grande/` hay una segunda versión con la isla **4 veces más grande**, para saber dónde está
+el techo de verdad. Se midió con un banco de pruebas (Chrome headless, GL por software) que
+rehace la isla entera de una sentada y lee `renderer.info`:
+
+| | normal | `grande/` | probada también |
+|---|---|---|---|
+| `WORLD_CHUNKS` / `ISLA_R` | 5 / 54 | **10 / 110** | 16 / 190 |
+| Chunks | 100 | 400 | 1024 |
+| Trabajo de CPU para montar la isla | 100 ms | 327 ms | ~900 ms |
+| Rejilla de navegación (`Nav`, va de golpe) | 15 ms | 159 ms | 263 ms |
+| Memoria (heap JS) | 39 MB | 91 MB | **206 MB** |
+| **Draw calls** | 114 | **123** | **117** |
+| Triángulos por fotograma | 61 716 | 60 570 | 64 070 |
+
+**Lo que hay que quedarse:** dibujar cuesta lo mismo con la isla grande. Three.js descarta lo
+que no entra en cámara, así que los chunks de más solo ocupan memoria; los fotogramas no se
+enteran. Lo que crece es la **carga** y la **memoria**.
+
+- El techo práctico es la **memoria**: a radio 190 son 206 MB de heap y Safari en iPhone mata
+  pestañas por ahí. Radio 110 (91 MB) va sobrado.
+- La carga está troceada (`stream()`, 8 ms por fotograma en móvil), así que no congela: solo
+  tarda más la barra.
+- **`Nav.construir` sí es un tirón de golpe** al acabar de cargar: recorre el mundo entero dos
+  veces. A radio 190 son 263 ms de parón. Si algún día se crece más, esto es lo primero que
+  hay que trocear.
+- Para ir **más allá** de radio ~150 hay que enganchar `stream()` al bucle del juego y
+  descargar los chunks lejanos. La mitad está hecha: la función ya trocea por milisegundos,
+  solo se llama una vez, al arrancar.
+
+Una isla grande **no vale solo con subir el radio**: a radio 110 salía un disco de galleta,
+plano y con el bosque igual de espeso en todas partes. La versión de `grande/` lleva además
+costa ondulada (un `fbm` que mueve el radio ±22), cerros de verdad (`WORLD_HEIGHT` a 48 para
+que quepan) y densidad de árboles por zonas, para que haya claros y bosque cerrado.
+
 ## Lo que voy a hacer (por orden)
 
 - [ ] **Que el gato haga cosas solo** cuando no lo controlas: dormir si tiene sueño, ir a
