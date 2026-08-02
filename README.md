@@ -53,10 +53,13 @@ CDN), así que el archivo funciona solo: lo abres y ya está, sin servidor ni in
 - `index.html` — el juego listo para jugar (three.js incrustado, ~790 KB)
 - `casita-fuente.html` — el mismo juego pero **sin** three.js incrustado, que es el archivo
   que se edita. Mucho más cómodo de leer (~187 KB)
+- `pequena/` — la isla original, cuatro veces más pequeña, por si se quiere comparar
+- `sw.js`, `app.webmanifest`, `icono-*.png` — lo que hace que en el iPhone se comporte como
+  una app de verdad: icono propio, pantalla completa y, sobre todo, que **se actualice sola**
 - `NOTAS.md` — cómo funciona por dentro, los tropiezos que ya están resueltos, y lo que falta
 
-Para reconstruir `index.html` a partir del fuente solo hay que meter three.js r128 dentro y
-quitarle las etiquetas `html`/`head`/`body`. Está explicado en `NOTAS.md`.
+Para reconstruir `index.html` a partir del fuente solo hay que meter three.js r128 dentro.
+Está explicado en `NOTAS.md`.
 
 ## Deploy
 

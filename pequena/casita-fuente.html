@@ -324,7 +324,7 @@
 
   <div id="inicio">
     <h1>La <em>casita</em></h1>
-    <p>Una isla entera por recorrer, una casa con luz tibia y alguien que solo quiere pasar un buen rato.</p>
+    <p>Una isla pequeña, una casa con luz tibia y alguien que solo quiere pasar un buen rato.</p>
     <div id="barra"><i></i></div>
     <button id="entrar" disabled>Preparando la isla…</button>
     <button id="denuevo">empezar de nuevo</button>
@@ -339,11 +339,11 @@
    CONSTANTES
    ============================================================ */
 const CHUNK_SIZE = 16;
-const WORLD_HEIGHT = 48;             // sitio de sobra para los cerros de la isla grande
+const WORLD_HEIGHT = 40;
 const SEA_LEVEL = 10;
 const GROUND_Y = 16;                 // altura del jardín llano
-const WORLD_CHUNKS = 10;             // chunks de -10 a 9  ->  320x320 bloques (más mar alrededor)
-const ISLA_R = 110;                  // radio de la isla
+const WORLD_CHUNKS = 5;              // chunks de -5 a 4  ->  160x160 bloques (más mar alrededor)
+const ISLA_R = 54;                   // radio de la isla
 const DAY_LENGTH = 600;              // 10 min de reloj = 1 día completo
 const HORA_INICIO = 8;
 
@@ -877,13 +877,10 @@ class World {
   height(wx, wz) {
     const c = this.noise.fbm(wx * 0.021, wz * 0.021, 3);              // lomas muy suaves
     const d = this.noise.fbm(wx * 0.07 + 40, wz * 0.07 - 12, 2);
-    const l = this.noise.fbm(wx * 0.013 + 200, wz * 0.013 - 90, 2);   // cerros y hondonadas de isla grande
-    let h = GROUND_Y + l * 9.5 + c * 4.2 + d * 1.1;
+    let h = GROUND_Y + c * 4.2 + d * 1.1;
 
-    // isla: el terreno cae al agua en el borde. El radio va ondulado, si no
-    // una isla de este tamaño se ve como un disco de galleta desde arriba.
-    const vaiven = this.noise.fbm(wx * 0.011 + 700, wz * 0.011 + 310, 2) * 22;
-    const orilla = sstep(ISLA_R, ISLA_R - 16, Math.hypot(wx, wz) - vaiven);   // 1 dentro, 0 fuera
+    // isla: el terreno cae al agua en el borde
+    const orilla = sstep(ISLA_R, ISLA_R - 16, Math.hypot(wx, wz));    // 1 dentro, 0 fuera
     h = (SEA_LEVEL - 4) + (h - (SEA_LEVEL - 4)) * orilla;
 
     // explanada llana donde va la casa
@@ -950,9 +947,7 @@ class World {
 
     for (let gz = g0z; gz <= g1z; gz++) {
       for (let gx = g0x; gx <= g1x; gx++) {
-        // densidad por zonas: bosque cerrado en unos sitios y claros en otros
-        const dens = 0.06 + 0.46 * clamp(0.5 + 0.75 * this.noise.fbm(gx * CELL * 0.014 + 300, gz * CELL * 0.014 - 77, 2), 0, 1);
-        if (hash01(gx, gz, this.seed) > dens) continue;
+        if (hash01(gx, gz, this.seed) > 0.34) continue;
         const tx = gx * CELL + Math.floor(hash01(gx, gz, this.seed + 7) * CELL);
         const tz = gz * CELL + Math.floor(hash01(gx, gz, this.seed + 13) * CELL);
         if (this.enCasa(tx, tz, 6)) continue;                       // deja libre el jardín
@@ -971,7 +966,7 @@ class World {
         }
         for (let dy = 1; dy <= alto; dy++) put(tx, h + dy, tz, WOOD, false);
         // apuntar el árbol: los de cerca de casa llevarán manzanas
-        if (this.arboles.length < 2000) this.arboles.push({ x: tx + 0.5, z: tz + 0.5, y: h, alto: alto });
+        if (this.arboles.length < 400) this.arboles.push({ x: tx + 0.5, z: tz + 0.5, y: h, alto: alto });
       }
     }
   }

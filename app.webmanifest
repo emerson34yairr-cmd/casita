@@ -1,0 +1,16 @@
+{
+  "name": "La casita",
+  "short_name": "Casita",
+  "description": "Una isla, una casa con luz tibia y alguien que solo quiere pasar un buen rato.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#DDEAF0",
+  "theme_color": "#DDEAF0",
+  "icons": [
+    { "src": "icono-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icono-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icono-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

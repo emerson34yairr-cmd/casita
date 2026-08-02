@@ -58,11 +58,12 @@ antialias, usa sombras baratas y reduce nubes, humo, mariposas y gotas de lluvia
 
 ## Hasta dónde aguanta la isla (medido, 2 de agosto de 2026)
 
-En `grande/` hay una segunda versión con la isla **4 veces más grande**, para saber dónde está
-el techo de verdad. Se midió con un banco de pruebas (Chrome headless, GL por software) que
-rehace la isla entera de una sentada y lee `renderer.info`:
+La isla **4 veces más grande** pasó a ser la principal (probada en iPhone: se ve bien y no va
+lenta). La original se quedó en `pequena/`, por si hace falta comparar. Se midió con un banco
+de pruebas (Chrome headless, GL por software) que rehace la isla entera de una sentada y lee
+`renderer.info`:
 
-| | normal | `grande/` | probada también |
+| | `pequena/` | **la de ahora** | probada también |
 |---|---|---|---|
 | `WORLD_CHUNKS` / `ISLA_R` | 5 / 54 | **10 / 110** | 16 / 190 |
 | Chunks | 100 | 400 | 1024 |
@@ -88,9 +89,29 @@ enteran. Lo que crece es la **carga** y la **memoria**.
   solo se llama una vez, al arrancar.
 
 Una isla grande **no vale solo con subir el radio**: a radio 110 salía un disco de galleta,
-plano y con el bosque igual de espeso en todas partes. La versión de `grande/` lleva además
-costa ondulada (un `fbm` que mueve el radio ±22), cerros de verdad (`WORLD_HEIGHT` a 48 para
-que quepan) y densidad de árboles por zonas, para que haya claros y bosque cerrado.
+plano y con el bosque igual de espeso en todas partes. Por eso lleva además costa ondulada
+(un `fbm` que mueve el radio ±22), cerros de verdad (`WORLD_HEIGHT` a 48 para que quepan) y
+densidad de árboles por zonas, para que haya claros y bosque cerrado.
+
+## El icono de la pantalla de inicio no se actualizaba
+
+Pasó de verdad: se republicó el juego y el icono que estaba añadido a la pantalla de inicio
+del iPhone seguía abriendo la versión vieja. Dos cosas lo causaban y las dos están arregladas:
+
+1. **La versión nueva estaba en otra URL** (`/casita/grande/`), y el icono apuntaba a
+   `/casita/`. Ahora la buena vive en la raíz y `grande/` solo redirige.
+2. **La caché de un web app en iOS es muy pegajosa.** Ahora hay un `sw.js` que va **primero a
+   la red** y solo tira de caché si no hay conexión, así que abrir el icono siempre trae lo
+   último. Si alguna vez se quiere lo contrario (que cargue instantáneo aunque esté viejo),
+   es ahí donde hay que cambiarlo — pero entonces vuelve el problema.
+
+`app.webmanifest` + `apple-touch-icon.png` son lo que le dan icono propio y pantalla completa.
+El icono se genera con Pillow a 32×32 y se amplía con NEAREST (`icono.py` en el scratchpad),
+para que salga de bloques como el juego.
+
+**Ojo:** un web app ya añadido a la pantalla de inicio **antes** de que existiera el
+`sw.js` no se entera. Hay que borrarlo de la pantalla y volver a añadirlo una vez; a partir
+de ahí se actualiza solo.
 
 ## Lo que voy a hacer (por orden)
 
