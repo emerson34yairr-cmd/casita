@@ -22,6 +22,12 @@ y se ve a pantalla completa (el propio juego te lo recuerda la primera vez).
   cuando un tesoro
 - **Cosas en la orilla**: conchas, piedras y estrellas de mar repartidas por toda la playa,
   para recoger. Lo que juntas se ve en el zurrón y se guarda
+- **Lo que juntas sirve**: los bichos que pescas se guardan y te los comes tocándolos en el
+  zurrón cuando te haga falta (cada uno alimenta lo suyo)
+- **Taller** (tecla `T` o el botón 🔨): con conchas, piedras, estrellas y el tesoro se hacen
+  cinco adornos para la casa — un móvil para la puerta, un farolillo que se enciende solo de
+  noche, un mojón de piedras, una guirnalda de estrellas y el cofre del tesoro. Cada uno se
+  hace una vez y se queda puesto
 - Ciclo de día y noche con luciérnagas, estrellas y las ventanas encendidas
 - **Chimenea con humo**, mariposas, nubes y **chubascos** de vez en cuando
 - Sonido ambiente sintetizado: viento, pájaros de día, grillos de noche, lluvia, y **pasos
@@ -49,6 +55,7 @@ y se ve a pantalla completa (el propio juego te lo recuerda la primera vez).
 | `P` | pausa |
 | `M` | silencio |
 | `O` | modo foto |
+| `T` | taller: hacer cosas con lo que encuentres |
 
 **Móvil:** arrastra a la izquierda para el mando, toca el suelo para ir andando, pellizca
 para el zoom, y los botones de la esquina para lo demás.

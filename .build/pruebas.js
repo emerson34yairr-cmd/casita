@@ -10,6 +10,7 @@ const THREE_JS = fs.readFileSync('/workspace/casita/.build/three-inline.html', '
 
 const r = [];
 const ok = (q, c, det) => { r.push({ q, c, det }); console.log(`${c ? '  OK  ' : ' FALLO'} ${q}${det ? '  — ' + det : ''}`); };
+const RECETAS_IDS = ['movil', 'farolillo', 'mojon', 'guirnalda', 'cofre'];
 
 async function nuevaPagina(browser, borrarAlmacen) {
   const ctx = await browser.newContext({ viewport: { width: 1100, height: 720 } });
@@ -62,6 +63,28 @@ async function entrar(page) {
   ok('hay de las tres clases', orilla.clases.length === 3, orilla.clases.join(', '));
   ok('todas sobre arena fuera del agua', orilla.sobreArena);
   ok('repartidas por toda la costa', orilla.angulos >= 12, `${orilla.angulos}/16 sectores`);
+
+  /* Las cosas de la orilla son "muebles" para que el clic las encuentre, pero un
+     mueble normal (a) bloquea el paso y (b) le pone a su celda de aproximación la
+     altura de la duela de casa. En la playa eso dejaba el suelo cinco bloques en el
+     aire. Se comprueban las dos cosas, que no se ven mirando el código. */
+  /* Se mira la celda DE LA CONCHA, no la de aproximación: esa cae 0,9 bloques más
+     allá y puede ser agua o hierba por derecho propio, que no es cosa nuestra. */
+  const navOrilla = await page.evaluate(() => {
+    const malAltura = [], bloqueadas = [];
+    for (const m of juego.casa.conchas) {
+      const suelo = juego.world.height(Math.floor(m.x), Math.floor(m.z)) + 1;
+      const dice = juego.nav.altura(m.x, m.z);
+      if (Math.abs(dice - suelo) > 0.1)
+        malAltura.push(`${m.x.toFixed(0)},${m.z.toFixed(0)}: nav ${dice.toFixed(1)} vs arena ${suelo}`);
+      if (!juego.nav.caminable(m.x, m.z)) bloqueadas.push(`${m.x.toFixed(0)},${m.z.toFixed(0)}`);
+    }
+    return { malAltura, bloqueadas, piso: +PISO.toFixed(2) };
+  });
+  ok('no levantan el suelo de la playa a la altura de la casa', navOrilla.malAltura.length === 0,
+     navOrilla.malAltura.slice(0, 2).join(' · ') || `las 48 a ras de arena (la duela está a ${navOrilla.piso})`);
+  ok('se puede andar por encima de ellas', navOrilla.bloqueadas.length === 0,
+     navOrilla.bloqueadas.length ? `${navOrilla.bloqueadas.length} celdas bloqueadas` : 'ninguna estorba');
 
   /* ============ 2. recoger suma al zurrón ============ */
   const recogida = await page.evaluate(() => {
@@ -119,16 +142,97 @@ async function entrar(page) {
   });
   ok('pescar de verdad anota la pieza', pescado.antes !== pescado.despues, pescado.texto);
 
+  /* ============ 3b. comerse los bichos del zurrón ============ */
+  const comida = await page.evaluate(() => {
+    juego.inventario = { dorada: 2, bota: 1, globo: 1 };
+    juego.necesidades.hambre = 30;
+    juego.pintarInventario();
+    const comibles = [...document.querySelectorAll('#zurron li.comible')].map(li => li.dataset.cosa);
+    const noComibles = [...document.querySelectorAll('#zurron li:not(.comible)')].map(li => li.dataset.cosa);
+    document.querySelector('#zurron li.comible').click();       // como si tocaras el pez
+    return { comibles, noComibles, hambre: Math.round(juego.necesidades.hambre),
+             quedan: juego.inventario.dorada, texto: document.getElementById('estado').textContent };
+  });
+  ok('sólo los bichos se pueden comer', comida.comibles.join() === 'dorada' && comida.noComibles.sort().join() === 'bota,globo',
+     `comibles: ${comida.comibles} · no: ${comida.noComibles}`);
+  ok('comerse un pez quita hambre', comida.hambre === 60, `30 → ${comida.hambre}`);
+  ok('y lo descuenta del zurrón', comida.quedan === 1, `quedaba(n) ${comida.quedan}`);
+
+  const ultimo = await page.evaluate(() => {
+    document.querySelector('#zurron li.comible').click();       // la segunda y última
+    return { hay: 'dorada' in juego.inventario, comibles: document.querySelectorAll('#zurron li.comible').length };
+  });
+  ok('al comerse el último desaparece del zurrón', !ultimo.hay && ultimo.comibles === 0);
+
+  const pezNo = await page.evaluate(() => {
+    juego.inventario = { globo: 1 };
+    juego.necesidades.hambre = 40;
+    juego.comer('globo');                       // el pez globo no alimenta
+    juego.comer('sardina');                     // y de esta no tenemos ninguna
+    return { hambre: Math.round(juego.necesidades.hambre), globo: juego.inventario.globo };
+  });
+  ok('no se come lo que no alimenta ni lo que no tienes', pezNo.hambre === 40 && pezNo.globo === 1);
+
+  /* ============ 3c. el taller ============ */
+  const taller = await page.evaluate(() => {
+    juego.inventario = { concha: 3, piedra: 1 };
+    juego.fabricados = [];
+    juego.pintarInventario();
+    juego.verTaller(true);
+    const filas = [...document.querySelectorAll('.receta')];
+    const botones = filas.map(f => { const b = f.querySelector('button'); return b ? !b.disabled : null; });
+    return {
+      abierto: document.getElementById('taller').classList.contains('on'),
+      recetas: filas.length,
+      // con 3 conchas y 1 piedra sólo debería poder hacerse el móvil
+      sePuede: botones, nombres: filas.map(f => f.querySelector('.nom').textContent),
+      botonVisible: document.getElementById('abrirTaller').classList.contains('on'),
+    };
+  });
+  ok('el taller abre con todas las recetas', taller.abierto && taller.recetas === 5, taller.nombres.join(' · '));
+  ok('sólo deja hacer lo que alcanza el material', JSON.stringify(taller.sePuede) === '[true,false,false,false,false]',
+     taller.sePuede.map((s, i) => (s ? '✓' : '✗') + taller.nombres[i].split(' ')[0]).join(' '));
+  ok('el botón del taller aparece al tener material', taller.botonVisible);
+
+  const hecho = await page.evaluate(() => {
+    document.querySelector('.receta button[data-receta="movil"]').click();
+    return {
+      fabricados: juego.fabricados.slice(),
+      inv: JSON.stringify(juego.inventario),
+      hayAdorno: !!(juego.casa.adornos && juego.casa.adornos.movil),
+      enEscena: !!(juego.casa.adornos && juego.casa.adornos.movil.parent),
+      filaHecha: document.querySelector('.receta').classList.contains('hecha'),
+      texto: document.getElementById('estado').textContent,
+    };
+  });
+  ok('fabricar deja el adorno puesto en la casa', hecho.hayAdorno && hecho.enEscena, hecho.texto);
+  ok('y gasta el material', hecho.inv === '{}', `zurrón: ${hecho.inv}`);
+  ok('y la receta queda marcada como hecha', hecho.filaHecha && hecho.fabricados.join() === 'movil');
+
+  const repe = await page.evaluate(() => {
+    juego.inventario = { concha: 9, piedra: 9 };
+    const ok1 = juego.fabricar('movil');            // ya está hecho
+    const ok2 = juego.fabricar('inventado');        // no existe
+    juego.inventario = { piedra: 1 };
+    const ok3 = juego.fabricar('mojon');            // hacen falta 4
+    return { ok1, ok2, ok3, veces: juego.fabricados.filter(x => x === 'movil').length };
+  });
+  ok('no se puede fabricar dos veces lo mismo', repe.ok1 === false && repe.veces === 1);
+  ok('ni una receta que no existe, ni sin material', repe.ok2 === false && repe.ok3 === false);
+  await page.evaluate(() => juego.verTaller(false));
+
   /* ============ 4. el huerto y el zurrón sobreviven a salir y volver ============ */
   const guardado = await page.evaluate(() => {
     juego.casa.parcelas[0].estado = 3; juego.casa.parcelas[0].crece = 0.4;
     juego.casa.parcelas[2].estado = 1; juego.casa.parcelas[2].regada = 30;
     juego.pintarParcela(juego.casa.parcelas[0]);
+    juego.inventario = { piedra: 1, dorada: 1 };      // algo que comprobar a la vuelta
     juego.guardarPartida();
     return { crudo: localStorage.getItem('casita_partida'), inv: JSON.stringify(juego.inventario) };
   });
   const gj = JSON.parse(guardado.crudo);
-  ok('el guardado sube a v3', gj.v === 3, JSON.stringify(gj).slice(0, 130) + '…');
+  ok('el guardado sube a v4', gj.v === 4, JSON.stringify(gj).slice(0, 130) + '…');
+  ok('lo fabricado va dentro', Array.isArray(gj.f) && gj.f.join() === 'movil', JSON.stringify(gj.f));
   ok('el huerto va dentro', Array.isArray(gj.h) && gj.h.length === 6, JSON.stringify(gj.h));
   ok('el zurrón va dentro', !!gj.i && Object.keys(gj.i).length > 0, JSON.stringify(gj.i));
   ok('las conchas recogidas van dentro', Array.isArray(gj.c) && gj.c.length >= 1, JSON.stringify(gj.c));
@@ -146,6 +250,11 @@ async function entrar(page) {
     inv: JSON.stringify(juego.inventario),
     recogidas: (juego.casa.conchas || []).filter(m => m.recogida).length,
     visiblesOk: (juego.casa.conchas || []).every(m => m.grupo.visible === !m.recogida),
+    fabricados: juego.fabricados.slice(),
+    adornoPuesto: !!(juego.casa.adornos && juego.casa.adornos.movil && juego.casa.adornos.movil.parent),
+    recetaHecha: (() => { juego.verTaller(true);
+      const f = document.querySelector('.receta'); const r = f && f.classList.contains('hecha');
+      juego.verTaller(false); return r; })(),
   }));
   ok('el huerto vuelve como estaba', vuelta.p0[0] === 3 && vuelta.p2[0] === 1,
      `parcela 0 = ${vuelta.p0}, parcela 2 = ${vuelta.p2}`);
@@ -153,6 +262,54 @@ async function entrar(page) {
   ok('el zurrón vuelve como estaba', vuelta.inv === guardado.inv, vuelta.inv);
   ok('las conchas recogidas no reaparecen', vuelta.recogidas >= 1 && vuelta.visiblesOk,
      `${vuelta.recogidas} sigue(n) recogida(s)`);
+  ok('el adorno fabricado sigue puesto al volver',
+     vuelta.fabricados.join() === 'movil' && vuelta.adornoPuesto && vuelta.recetaHecha,
+     `fabricados: ${vuelta.fabricados}`);
+  await page.close(); await ctx.close();
+
+  /* ============ 4b. los cinco adornos se montan sin romper nada ============ */
+  ({ ctx, page } = await nuevaPagina(browser));
+  await page.addInitScript(() => { try { localStorage.clear(); } catch (e) {} });
+  await entrar(page);
+  const todos = await page.evaluate(() => {
+    const r = {};
+    // por ponerAdorno, que es lo que usa el juego: monta la pieza Y avisa a la navegación
+    for (const rec of RECETAS) {
+      juego.ponerAdorno(rec);
+      const g = juego.casa.adornos[rec.id];
+      r[rec.id] = { montado: !!g, enEscena: !!(g && g.parent), hijos: g ? g.children.length : 0 };
+    }
+    const dosVeces = juego.casa.adorno('movil', juego.world) === juego.casa.adornos.movil;
+    // ¿alguno se quedó bajo tierra o flotando en el cielo?
+    const alturas = Object.values(juego.casa.adornos).map(g => {
+      const b = new THREE.Box3().setFromObject(g);
+      return { min: +b.min.y.toFixed(1), max: +b.max.y.toFixed(1) };
+    });
+    return { r, dosVeces, alturas, luces: juego.casa.luces.length };
+  });
+  const todosOk = RECETAS_IDS.every(id => todos.r[id].montado && todos.r[id].enEscena && todos.r[id].hijos > 0);
+  ok('los cinco adornos se montan', todosOk,
+     Object.entries(todos.r).map(([k, v]) => k + (v.enEscena ? '✓' : '✗')).join(' '));
+  ok('montar el mismo dos veces no lo duplica', todos.dosVeces);
+  ok('ninguno queda bajo tierra ni flotando',
+     todos.alturas.every(a => a.min > 14 && a.max < 28),
+     todos.alturas.map(a => a.min + '–' + a.max).join(', '));
+  ok('el farolillo añade su luz', todos.luces >= 3, `${todos.luces} luces en la casa`);
+
+  // los que ocupan sitio tienen que estorbar, como cualquier mueble
+  const navAdornos = await page.evaluate(() => {
+    const r = {};
+    for (const rec of RECETAS) {
+      if (!rec.estorba) { r[rec.id] = 'no ocupa (cuelga)'; continue; }
+      const cx = (rec.estorba[0] + rec.estorba[2]) / 2, cz = (rec.estorba[1] + rec.estorba[3]) / 2;
+      r[rec.id] = juego.nav.caminable(cx, cz) ? 'SE ATRAVIESA' : 'estorba ok';
+    }
+    return r;
+  });
+  ok('no se atraviesan los adornos que ocupan sitio',
+     !Object.values(navAdornos).includes('SE ATRAVIESA'),
+     Object.entries(navAdornos).map(([k, v]) => k + ': ' + v).join(' · '));
+  await page.screenshot({ path: `${OUT}/adornos.png` });
   await page.close(); await ctx.close();
 
   /* ============ 5. una partida vieja (v2) sigue cargando ============ */
@@ -170,18 +327,22 @@ async function entrar(page) {
     huertoVacio: juego.casa.parcelas.every(m => m.estado === 0),
     zurronVacio: Object.keys(juego.inventario).length === 0,
     panelOculto: !document.getElementById('zurron').classList.contains('on'),
+    sinFabricar: juego.fabricados.length === 0,
+    tallerOculto: !document.getElementById('abrirTaller').classList.contains('on'),
   }));
   // el reloj sigue corriendo entre que entra y que se lee, así que se mira la horquilla
   ok('una partida v2 entra sin romperse', vieja.entro && vieja.tiempo >= 900 && vieja.tiempo < 960,
      `t=${vieja.tiempo} (guardado 900), energía=${vieja.energia}`);
   ok('v2: el huerto arranca vacío', vieja.huertoVacio);
   ok('v2: el zurrón arranca vacío y oculto', vieja.zurronVacio && vieja.panelOculto);
+  ok('v2: sin nada fabricado y sin botón de taller', vieja.sinFabricar && vieja.tallerOculto);
   ok('v2 no deja errores en consola', page.errs.length === 0, page.errs.slice(0, 2).join(' | ') || 'ninguno');
   await page.close(); await ctx.close();
 
   /* ============ 6. partidas rotas no cuelgan el juego ============ */
   for (const [nom, val] of [['basura', '{{{no es json'], ['a medias', '{"t":100}'],
-                            ['huerto corrupto', '{"t":10,"n":{},"h":"no soy lista","i":5,"c":"tampoco","v":3}']]) {
+                            ['huerto corrupto', '{"t":10,"n":{},"h":"no soy lista","i":5,"c":"tampoco","v":3}'],
+                            ['recetas inventadas', '{"t":10,"n":{},"f":["noexiste","movil","noexiste"],"v":4}']]) {
     ({ ctx, page } = await nuevaPagina(browser));
     await page.addInitScript(v => localStorage.setItem('casita_partida', v), val);
     await entrar(page);

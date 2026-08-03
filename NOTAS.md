@@ -135,10 +135,50 @@ espere algo del juego tiene que mirar `juego.tiempo`, no contar segundos reales.
 un rato persiguiendo un fallo de la autonomía del gato que no existía: era la prueba, que
 esperaba 23 s reales creyendo que eran 23 s de juego (eran 4).
 
-## El zurrón y el guardado v3
+## Dos trampas de Nav que costaron sangre
 
-El formato de `casita_partida` pasó de `v:2` a `v:3`. Lo nuevo: `h` (el huerto, parcela a
-parcela), `i` (el zurrón) y `c` (qué cosas de la orilla ya se recogieron, por su número).
+**Un "mueble" hace más de lo que parece.** Las cosas de la orilla se montaron como
+muebles para que el clic de siempre las encontrara sin tocar el sistema de toques. Pero
+`Nav.construir` hace dos cosas con cada mueble:
+
+1. `bloquear(m.rect)` — deja de ser caminable.
+2. `abrir(m.anclaX ± 0.4, …, PISO)` — **le pone a su celda de aproximación la altura
+   `PISO`**, que es la duela de dentro de casa (17,06).
+
+Lo segundo nunca había molestado porque todos los muebles de fuera que existían
+(manzanos, huerto, muelle) están en la explanada de la casa, justo a la altura de `PISO`.
+Las conchas fueron lo primero que se puso lejos: la playa está a 12, así que 48 celdas de
+arena se quedaban **cinco bloques en el aire** y el gato se subía al vacío al acercarse.
+
+Arreglado con la marca `noEstorba: true`, que salta las dos cosas. Si algún día se pone
+otro mueble lejos de la casa, acordarse de esto.
+
+**Los adornos fabricados sí tienen que estorbar.** No son muebles, así que no entran en la
+rejilla: el gato los atravesaba, y eso choca con que la cama y el sofá sí paren. Los que
+ocupan sitio llevan un `estorba: [x0,z0,x1,z1]` en su receta y `ponerAdorno()` se lo pasa a
+`nav.bloquear`. Se **retoca** la rejilla en vez de rehacerla: `Nav.construir` recorre el
+mundo entero dos veces, son ~160 ms de parón, y es un tirón feo por poner una torrecita de
+piedras. El móvil y la guirnalda no llevan hueco porque cuelgan.
+
+## El zurrón, el taller y el guardado v4
+
+El inventario dejó de ser un contador. Dos cosas lo usan:
+
+**Comer.** Pescar ya NO alimenta al sacar la pieza: el pez se guarda y te lo comes tocándolo
+en el zurrón (`juego.comer`). Pescar da la alegría, comer da la comida. Lo que alimenta va
+en el campo `alimenta` de `COSAS`; lo que no lo lleva no se puede comer (el pez globo).
+
+**El taller** (`RECETAS`, botón 🔨 o tecla T). Cada receta se hace **una vez**: son adornos
+con sitio fijo, y así juntarlo todo es una colección con final. Al fabricar se gasta el
+material, se monta la pieza y se guarda.
+
+Para añadir una receta: una entrada en `RECETAS` + su rama en `Casa.adorno()`. Si ocupa
+sitio en el suelo, ponerle `estorba`. El id se guarda en la partida: cambiarle el nombre a
+uno rompe las partidas guardadas.
+
+El formato de `casita_partida` pasó de `v:2` a `v:4`. Lo nuevo: `h` (el huerto, parcela a
+parcela), `i` (el zurrón), `c` (qué cosas de la orilla ya se recogieron, por su número) y
+`f` (los adornos fabricados, por su id: sólo el id, la geometría se remonta al entrar).
 
 **Una partida `v:2` tiene que seguir cargando**, con el huerto sin plantar y el zurrón
 vacío. Cada bloque de `restaurarPartida` comprueba antes de tocar nada, y hay pruebas que
@@ -170,9 +210,12 @@ cada partida para poder guardar "la número 7 ya la recogí".
 - [x] ~~Recoger conchas y piedras en la playa~~ — hecho: conchas, piedras y estrellas de mar.
 - [x] ~~Que la pesca dé cosas distintas~~ — hecho: cinco bichos, la bota y el tesoro (3 %).
 - [x] ~~Guardar también el huerto~~ — hecho, en el formato v:3.
-- [ ] **Que el gato use también las cosas del zurrón**: ahora se juntan conchas y peces y no
-      sirven para nada más que para contarlos. Un peces→comida, o adornar la casa con lo
-      que encuentras, sería lo siguiente.
+- [x] ~~Que lo del zurrón sirva para algo~~ — hecho: los bichos se comen tocándolos, y con
+      conchas, piedras, estrellas y el tesoro se fabrican cinco adornos para la casa.
+- [ ] **Más recetas**: ahora son cinco y se acaban. Un banco para el porche, una alfombra,
+      un farol para dentro. Añadir una es una entrada en `RECETAS` y su rama en
+      `Casa.adorno()`.
+- [ ] **Que el cofre se abra** y enseñe de verdad lo que llevas dentro: ahora es un adorno.
 - [ ] **Más muebles usables**: estantería para leer, ducha, escritorio.
 - [ ] **Estaciones o al menos un otoño**: las hojas de los árboles tirando a naranja según el día.
 - [ ] **Un diario de la casa**: "día 4, llovió, cosechaste dos tomates".

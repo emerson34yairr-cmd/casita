@@ -70,9 +70,57 @@ if ('serviceWorker' in navigator) {
   }
   #zurron.on { display:block; }
   #zurron h2 { font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--tinta2); margin-bottom:7px; font-weight:600; }
-  #zurron ul { list-style:none; display:flex; flex-wrap:wrap; gap:4px 9px; }
+  #zurron ul { list-style:none; display:flex; flex-wrap:wrap; gap:4px 7px; }
   #zurron li { font-size:13px; font-variant-numeric:tabular-nums; }
   #zurron li b { font-weight:600; margin-left:1px; }
+  /* lo que se puede comer se toca; lo demás es sólo cuenta */
+  #zurron li.comible {
+    pointer-events:auto; cursor:pointer; padding:1px 5px; margin:-1px -1px;
+    border-radius:8px; background:var(--crema2); transition:background .15s, transform .1s;
+  }
+  #zurron li.comible:active { transform:translateY(1px); background:#E4D8C2; }
+  #zurron .pista { display:block; width:100%; font-size:10.5px; color:var(--tinta2); margin-top:5px; }
+
+  /* ---------- taller ---------- */
+  /* vive dentro de la tarjeta del reloj, al lado de pausa y silencio: es el único
+     sitio de la interfaz que no se mueve ni lo tapa el mando del móvil */
+  #abrirTaller {
+    pointer-events:auto; cursor:pointer; border:none; background:var(--crema2); color:var(--tinta2);
+    width:30px; height:30px; border-radius:10px; font-size:14px; font-family:inherit;
+    transition:background .2s, transform .12s; display:none;
+  }
+  #abrirTaller.on { display:block; }
+  #abrirTaller:active { transform:translateY(2px); }
+  #taller {
+    position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+    padding:16px 18px; width:min(340px, calc(100vw - 36px)); max-height:min(78vh, 560px);
+    overflow-y:auto; pointer-events:auto; display:none; z-index:6;
+  }
+  #taller.on { display:block; }
+  #taller h2 { font-size:15px; font-weight:600; margin-bottom:3px; }
+  #taller .sub { font-size:11.5px; color:var(--tinta2); margin-bottom:12px; }
+  .receta { display:flex; gap:10px; align-items:flex-start; padding:9px 0; border-top:1px solid var(--crema2); }
+  .receta:first-of-type { border-top:none; }
+  .receta .cara { font-size:22px; line-height:1.1; width:26px; text-align:center; }
+  .receta .txt { flex:1; min-width:0; }
+  .receta .nom { font-size:13.5px; font-weight:600; }
+  .receta .dice { font-size:11px; color:var(--tinta2); line-height:1.45; margin:1px 0 4px; }
+  .receta .pide { font-size:11.5px; font-variant-numeric:tabular-nums; }
+  .receta .pide i { font-style:normal; margin-right:7px; }
+  .receta .pide i.falta { color:#C87A72; }
+  .receta button {
+    pointer-events:auto; cursor:pointer; border:none; font-family:inherit; font-size:12px;
+    background:var(--salvia); color:#fff; padding:6px 11px; border-radius:10px; align-self:center;
+    box-shadow:0 2px 0 rgba(76,66,56,.18);
+  }
+  .receta button:disabled { background:var(--crema2); color:#B0A28C; box-shadow:none; cursor:default; }
+  .receta.hecha .nom { color:var(--tinta2); }
+  .receta .listo { font-size:11.5px; color:#7A9A73; align-self:center; font-weight:600; }
+  #cerrarTaller {
+    pointer-events:auto; cursor:pointer; border:none; font-family:inherit; width:100%;
+    margin-top:12px; background:var(--crema2); color:var(--tinta2);
+    padding:8px; border-radius:10px; font-size:12.5px;
+  }
 
   /* ---------- reloj ---------- */
   #clock {
@@ -309,6 +357,13 @@ if ('serviceWorker' in navigator) {
     <ul></ul>
   </div>
 
+  <div id="taller" class="card">
+    <h2>Hacer cosas</h2>
+    <div class="sub">Con lo que vas encontrando por la isla.</div>
+    <div id="recetas"></div>
+    <button id="cerrarTaller">Cerrar</button>
+  </div>
+
   <div id="clock" class="card">
     <div>
       <div id="hora">08:00</div>
@@ -316,6 +371,7 @@ if ('serviceWorker' in navigator) {
     </div>
     <button id="pausa" title="Pausa">❚❚</button>
     <button id="mudo" title="Silencio (M)">♪</button>
+    <button id="abrirTaller" title="Hacer cosas (T)">🔨</button>
   </div>
 
   <div id="estado" class="card"></div>
@@ -327,7 +383,8 @@ if ('serviceWorker' in navigator) {
     <b>Botón der.</b> girar &nbsp; <b>rueda</b> zoom<br>
     <b>V</b> 1ª persona (clic captura el ratón)<br>
     <b>C</b> gato / ptera &nbsp; <b>F</b> centrar<br>
-    <b>Q E</b> girar &nbsp; <b>R</b> techo &nbsp; <b>P</b> pausa &nbsp; <b>G</b> agua
+    <b>Q E</b> girar &nbsp; <b>R</b> techo &nbsp; <b>P</b> pausa &nbsp; <b>G</b> agua<br>
+    <b>T</b> hacer cosas con lo que encuentres
   </div>
   <button id="ayuda" title="Ayuda">?</button>
   <div id="alinicio" class="card"></div>
@@ -427,27 +484,53 @@ const COSAS = {
   concha:   { emoji: '🐚', nombre: 'una concha' },
   piedra:   { emoji: '🪨', nombre: 'una piedra bonita' },
   estrella: { emoji: '⭐', nombre: 'una estrella de mar' },
-  sardina:  { emoji: '🐟', nombre: 'una sardina' },
-  dorada:   { emoji: '🐠', nombre: 'una dorada' },
-  gamba:    { emoji: '🦐', nombre: 'una gamba' },
-  pulpo:    { emoji: '🐙', nombre: 'un pulpo' },
-  globo:    { emoji: '🐡', nombre: 'un pez globo' },
+  sardina:  { emoji: '🐟', nombre: 'una sardina',    alimenta: 20 },
+  dorada:   { emoji: '🐠', nombre: 'una dorada',     alimenta: 30 },
+  gamba:    { emoji: '🦐', nombre: 'una gamba',      alimenta: 13 },
+  pulpo:    { emoji: '🐙', nombre: 'un pulpo',       alimenta: 34 },
+  globo:    { emoji: '🐡', nombre: 'un pez globo' },   // mejor no comérselo
   bota:     { emoji: '🥾', nombre: 'una bota vieja' },
   tesoro:   { emoji: '💎', nombre: 'un tesoro' }
 };
+
+/* Lo que se puede hacer con lo que juntas. Cada cosa se hace UNA vez: son adornos
+   con su sitio fijo en la casa, y así juntarlo todo es una colección con final.
+   Las cuentas están puestas para que la primera se pueda hacer en una tarde de
+   playa, y el cofre cueste de verdad porque necesita el tesoro. */
+const RECETAS = [
+  { id: 'movil', nombre: 'Móvil de conchas', emoji: '🎐',
+    pide: { concha: 3, piedra: 1 },
+    dice: 'Para colgar junto a la puerta. Suena cuando pasas.' },
+  { id: 'farolillo', nombre: 'Farolillo de concha', emoji: '🏮',
+    pide: { concha: 2, estrella: 1 },
+    dice: 'Se enciende solo al caer la noche, fuera en el patio.',
+    estorba: [-3.4, 6.4, -2.4, 7.4] },
+  { id: 'mojon', nombre: 'Mojón de piedras', emoji: '🗿',
+    pide: { piedra: 4 },
+    dice: 'Una torrecita de piedras en el jardín.',
+    estorba: [4.1, 7.9, 5.1, 8.9] },
+  { id: 'guirnalda', nombre: 'Guirnalda de estrellas', emoji: '✨',
+    pide: { estrella: 3 },
+    dice: 'Para la pared del fondo, dentro de casa.' },
+  { id: 'cofre', nombre: 'Cofre del tesoro', emoji: '🧰',
+    pide: { tesoro: 1, piedra: 3 },
+    dice: 'Donde guardar lo que saques del mar. Junto al hogar.',
+    estorba: [-2.5, -5.0, -0.9, -4.0] }
+];
+// el móvil y la guirnalda no llevan hueco: cuelgan, no se tropieza con ellos
 
 /* Lo que puede salir al pescar, con su peso. Está calibrado para que pescar siga
    siendo tranquilo: casi siempre sale algo de comer, la bota es la broma que rompe
    la rutina, y el tesoro sale una de cada treinta y pico, que es lo que hace que
    valga la pena volver al muelle. */
 const PESCA = [
-  { cosa: 'sardina', peso: 30, hambre: 18, diversion: 10, texto: 'Una sardina, para la cena' },
-  { cosa: 'dorada',  peso: 19, hambre: 26, diversion: 16, texto: '¡Una dorada preciosa!' },
-  { cosa: 'gamba',   peso: 15, hambre: 12, diversion: 12, texto: 'Una gamba: pequeña, pero rica' },
-  { cosa: 'globo',   peso:  9, hambre:  0, diversion: 22, texto: '¡Un pez globo! Mejor no comérselo' },
-  { cosa: 'pulpo',   peso:  6, hambre: 30, diversion: 26, texto: '¡Un pulpo! Vaya pieza' },
-  { cosa: 'bota',    peso: 18, hambre:  0, diversion: -3, texto: 'Una bota vieja… en fin' },
-  { cosa: 'tesoro',  peso:  3, hambre:  0, diversion: 42, texto: '¡UN TESORO! Esto no pasa todos los días' }
+  { cosa: 'sardina', peso: 30, diversion: 10, texto: 'Una sardina, para la cena' },
+  { cosa: 'dorada',  peso: 19, diversion: 16, texto: '¡Una dorada preciosa!' },
+  { cosa: 'gamba',   peso: 15, diversion: 12, texto: 'Una gamba: pequeña, pero rica' },
+  { cosa: 'globo',   peso:  9, diversion: 22, texto: '¡Un pez globo! Mejor no comérselo' },
+  { cosa: 'pulpo',   peso:  6, diversion: 26, texto: '¡Un pulpo! Vaya pieza' },
+  { cosa: 'bota',    peso: 18, diversion: -3, texto: 'Una bota vieja… en fin' },
+  { cosa: 'tesoro',  peso:  3, diversion: 42, texto: '¡UN TESORO! Esto no pasa todos los días' }
 ];
 
 const isOpaque = id => id !== AIR && id !== WATER;
@@ -1756,7 +1839,11 @@ class Casa {
         verbo: 'Recoger', tipo: 'orilla', cosa: clase, idOrilla: i,
         x: px, z: pz,
         anclaX: px, anclaZ: pz + 0.9, mirar: Math.PI,
-        rect: [px - 0.6, pz - 0.6, px + 0.6, pz + 0.6]
+        rect: [px - 0.6, pz - 0.6, px + 0.6, pz + 0.6],
+        // se pasa por encima: es una concha, no un armario. Y sobre todo, sin esto
+        // Nav le pondría a su celda la altura de la duela de casa (PISO, 17) estando
+        // la playa a 12: el gato se subía cinco bloques al aire al acercarse.
+        noEstorba: true
       });
       m.grupo.position.set(px, y, pz);
       m.grupo.rotation.y = giro;
@@ -1768,6 +1855,84 @@ class Casa {
       this.conchas.push(m);
       this.grupo.add(m.grupo);
     }
+  }
+
+  /* ---------------- los adornos que se fabrican ----------------
+     Cada uno tiene su sitio fijo, elegido para que no pise ningún mueble ni tape
+     una ventana. Se montan sueltos (no son muebles) porque no se usan: se miran. */
+  adorno(id, world) {
+    if (!this.adornos) this.adornos = {};
+    if (this.adornos[id]) return this.adornos[id];       // ya estaba puesto
+    const c = this.nuevo();
+    const g = new THREE.Group();
+    const suelo = (x, z) => world ? world.height(Math.floor(x), Math.floor(z)) + 1 : PISO;
+
+    if (id === 'movil') {
+      // junto a la puerta, por fuera: barra, cordeles y conchas colgando
+      const x = 2.3, z = 5.62, y = PISO + 2.5;
+      c.caja(x, y, z, 1.1, 0.09, 0.09, T.tabla, TINTE.maderaM, 0.5);
+      const tonos = ['#F2E2D0', '#EFCFC8', '#E8D8BE'];
+      for (let k = 0; k < 4; k++) {
+        const ox = x - 0.42 + k * 0.28, largo = 0.34 + (k % 2) * 0.16;
+        c.caja(ox, y - largo / 2, z, 0.03, largo, 0.03, T.liso, '#C9B79A', 0.15);
+        c.caja(ox, y - largo - 0.1, z, 0.19, 0.2, 0.1, T.liso, tonos[k % 3], 0.22);
+      }
+    } else if (id === 'farolillo') {
+      // en el patio: un poste con una concha ahuecada por tulipa
+      const x = -2.9, z = 6.9, y = suelo(x, z);
+      c.caja(x, y + 0.9, z, 0.16, 1.8, 0.16, T.tabla, TINTE.maderaM, 0.5);
+      c.caja(x, y + 0.06, z, 0.6, 0.12, 0.6, T.liso, '#A9A296', 0.3);
+      c.caja(x, y + 1.86, z, 0.5, 0.14, 0.5, T.liso, '#EFCFC8', 0.2);
+      const bombilla = caja(0.34, 0.34, 0.34, COLOR.luzCalida, x, y + 1.66, z);
+      bombilla.material = new THREE.MeshPhongMaterial({ color: new THREE.Color(COLOR.luzCalida) });
+      bombilla.castShadow = false;
+      g.add(bombilla);
+      const luz = new THREE.PointLight(0xFFD9A0, 0, 11, 2);
+      luz.position.set(x, y + 1.7, z);
+      g.add(luz);
+      this.luces.push(luz);      // así se enciende sola con las demás al anochecer
+    } else if (id === 'mojon') {
+      // torrecita de piedras, de más ancha a más estrecha
+      const x = 4.6, z = 8.4, y = suelo(x, z);
+      const anchos = [0.72, 0.58, 0.46, 0.3], altos = [0.24, 0.2, 0.18, 0.14];
+      const grises = ['#A9A296', '#B9B2A5', '#9E9689', '#C3BCAE'];
+      let py = y;
+      for (let k = 0; k < 4; k++) {
+        c.caja(x + (k % 2 ? 0.05 : -0.04), py + altos[k] / 2, z + (k === 2 ? 0.06 : 0),
+               anchos[k], altos[k], anchos[k] * 0.85, T.liso, grises[k], 0.3);
+        py += altos[k];
+      }
+    } else if (id === 'guirnalda') {
+      // en la pared del fondo, por dentro: un cordel con estrellas colgadas
+      const z = -5.24, y = PISO + 2.45;
+      c.caja(0, y, z, 4.2, 0.04, 0.04, T.liso, '#C9B79A', 0.15);
+      for (let k = 0; k < 5; k++) {
+        const ox = -1.6 + k * 0.8, caida = 0.18 + (k % 2) * 0.14;
+        c.caja(ox, y - caida / 2, z, 0.025, caida, 0.025, T.liso, '#C9B79A', 0.15);
+        for (let b = 0; b < 5; b++) {           // los cinco brazos de la estrella
+          const a = b / 5 * Math.PI * 2 + 0.3;
+          c.caja(ox + Math.cos(a) * 0.13, y - caida - 0.12 + Math.sin(a) * 0.13, z,
+                 0.11, 0.11, 0.07, T.liso, '#EDC97A', 0.22);
+        }
+        c.caja(ox, y - caida - 0.12, z, 0.15, 0.15, 0.08, T.liso, '#F0D68C', 0.22);
+      }
+    } else if (id === 'cofre') {
+      // junto al hogar, contra el muro norte
+      const x = -1.7, z = -4.5;
+      c.caja(x, PISO + 0.3, z, 1.5, 0.6, 0.95, T.tabla, TINTE.maderaM, 0.6);
+      c.caja(x, PISO + 0.68, z, 1.56, 0.2, 1.0, T.tabla, TINTE.maderaC, 0.6);
+      c.caja(x, PISO + 0.3, z + 0.49, 1.56, 0.12, 0.06, T.liso, TINTE.metal, 0.2);
+      c.caja(x, PISO + 0.62, z + 0.49, 0.26, 0.3, 0.08, T.liso, '#D9B45C', 0.2);
+      c.caja(x - 0.62, PISO + 0.32, z, 0.08, 0.66, 1.0, T.liso, TINTE.metal, 0.2);
+      c.caja(x + 0.62, PISO + 0.32, z, 0.08, 0.66, 1.0, T.liso, TINTE.metal, 0.2);
+    } else {
+      return null;
+    }
+
+    g.add(c.malla(this.material()));
+    this.grupo.add(g);
+    this.adornos[id] = g;
+    return g;
   }
 
   /* ---------------- manzanos: unos cuantos árboles con fruta ---------------- */
@@ -2107,10 +2272,14 @@ class Nav {
     this.bloquear(b.x0 - 0.5, b.z0 - 0.5, b.x0 + 0.5, b.z1 + 0.5);
     this.bloquear(b.x1 - 0.5, b.z0 - 0.5, b.x1 + 0.5, b.z1 + 0.5);
     this.abrir(-1.6, b.z1 - 0.6, 1.6, b.z1 + 0.6, PISO);
-    // muebles
-    for (const m of casa.muebles) this.bloquear(m.rect[0], m.rect[1], m.rect[2], m.rect[3]);
+    /* Muebles. Los marcados "noEstorba" (las cosillas de la orilla) se saltan las DOS
+       cosas: ni bloquean —se pasa por encima de una concha— ni se les fuerza el suelo
+       a PISO, que es la altura de la duela de casa y dejaría la playa por las nubes. */
+    for (const m of casa.muebles)
+      if (!m.noEstorba) this.bloquear(m.rect[0], m.rect[1], m.rect[2], m.rect[3]);
     // el sitio donde se para el personaje siempre libre
-    for (const m of casa.muebles) this.abrir(m.anclaX - 0.4, m.anclaZ - 0.4, m.anclaX + 0.4, m.anclaZ + 0.4, PISO);
+    for (const m of casa.muebles)
+      if (!m.noEstorba) this.abrir(m.anclaX - 0.4, m.anclaZ - 0.4, m.anclaX + 0.4, m.anclaZ + 0.4, PISO);
 
     /* --- alturas de bloqueo: suelo, copas de los árboles y la casa entera --- */
     for (let cz = 0; cz < this.W; cz++) {
@@ -3686,6 +3855,7 @@ class Juego {
 
     this.necesidades = { energia: 74, hambre: 62, diversion: 68 };
     this.inventario = {};        // lo que se ha ido juntando: {concha: 3, dorada: 1, …}
+    this.fabricados = [];        // los adornos ya hechos, por su id
     this.ocio = 0;               // segundos desde la última vez que tocaste algo
     this.auto = null;            // lo que el gato está haciendo por su cuenta
     this.ultimaAuto = null;      // y lo anterior, para que no repita
@@ -3716,6 +3886,9 @@ class Juego {
       nuevaPartida: document.getElementById('denuevo'),
       zurron: document.getElementById('zurron'),
       zurronLista: document.querySelector('#zurron ul'),
+      taller: document.getElementById('taller'),
+      recetas: document.getElementById('recetas'),
+      abrirTaller: document.getElementById('abrirTaller'),
       needs: {}
     };
     document.querySelectorAll('.need').forEach(el => {
@@ -3807,7 +3980,8 @@ class Juego {
         i: this.inventario,
         // las de la orilla ya recogidas, por su número: así no reaparecen
         c: (this.casa.conchas || []).filter(m => m.recogida).map(m => m.idOrilla),
-        v: 3   // versión del formato, por si algún día cambia
+        f: this.fabricados,
+        v: 4   // versión del formato, por si algún día cambia
       }));
     } catch (e) {}
   }
@@ -3824,8 +3998,8 @@ class Juego {
       this.camara.foco.set(x, PISO, z);
     }
 
-    /* De aquí abajo es todo de la v3. Una partida vieja (v:2) no trae ninguno de
-       estos campos: se queda con el huerto sin plantar y el zurrón vacío, que es
+    /* De aquí abajo es todo de la v3 en adelante. Una partida vieja no trae ninguno
+       de estos campos: se queda con el huerto sin plantar y el zurrón vacío, que es
        exactamente donde estaba. Por eso cada bloque comprueba antes de tocar nada. */
     if (Array.isArray(p.h) && this.casa.parcelas) {
       p.h.forEach((g, k) => {
@@ -3845,6 +4019,13 @@ class Juego {
       const fuera = new Set(p.c);
       for (const m of this.casa.conchas)
         if (fuera.has(m.idOrilla)) { m.recogida = true; m.grupo.visible = false; }
+    }
+    // los adornos hechos se vuelven a montar: sólo se guarda su id, no la geometría
+    if (Array.isArray(p.f)) {
+      for (const id of p.f) {
+        const r = RECETAS.find(x => x.id === id);
+        if (r && !this.fabricados.includes(id)) { this.fabricados.push(id); this.ponerAdorno(r); }
+      }
     }
     this.pintarInventario();
 
@@ -4033,7 +4214,8 @@ class Juego {
       if (e.code === 'KeyV') this.cambiarVista();
       if (e.code === 'KeyC') this.cambiarPersonaje();
       if (e.code === 'KeyG') this.alternarAgua();
-      if (e.code === 'Escape') this.parar();
+      if (e.code === 'Escape') { if (this.dom.taller.classList.contains('on')) this.verTaller(false); else this.parar(); }
+      if (e.code === 'KeyT') this.verTaller();
       if (e.code === 'Space') { e.preventDefault(); this.saltar(); }
       if (e.code === 'KeyP') this.alternarPausa();
       if (e.code === 'KeyM' && this.alternarMudo) this.alternarMudo();
@@ -4041,6 +4223,20 @@ class Juego {
     });
     addEventListener('keyup', e => this.teclas.delete(e.code));
     addEventListener('blur', () => this.teclas.clear());
+
+    /* ---- zurrón y taller ----
+       Se escucha en el contenedor y no en cada cosa, porque las listas se rehacen
+       enteras cada vez que recoges algo: enganchar uno por uno se perdería. */
+    this.dom.zurronLista.addEventListener('click', e => {
+      const li = e.target.closest('li.comible');
+      if (li) this.comer(li.dataset.cosa);
+    });
+    this.dom.abrirTaller.addEventListener('click', () => this.verTaller(true));
+    document.getElementById('cerrarTaller').addEventListener('click', () => this.verTaller(false));
+    this.dom.recetas.addEventListener('click', e => {
+      const b = e.target.closest('button[data-receta]');
+      if (b && !b.disabled) this.fabricar(b.dataset.receta);
+    });
 
     document.getElementById('pausa').addEventListener('click', () => this.alternarPausa());
     const btnMudo = document.getElementById('mudo');
@@ -4366,7 +4562,8 @@ class Juego {
       else if (salio.cosa === 'bota') this.sonido.chasco();
       else this.sonido.campanita();
       p.emoji(cosa.emoji);
-      this.necesidades.hambre = clamp(this.necesidades.hambre + salio.hambre, 0, 100);
+      // el pez ya NO alimenta al sacarlo: se guarda y te lo comes desde el zurrón
+      // cuando te haga falta. Pescar da la alegría; comer, la comida.
       this.necesidades.diversion = clamp(this.necesidades.diversion + salio.diversion, 0, 100);
       const llevas = this.anotar(salio.cosa);
       this.texto(cosa.emoji + '  ' + salio.texto + (llevas > 1 ? ' · llevas ' + llevas : ''));
@@ -4649,9 +4846,98 @@ class Juego {
     if (!d.zurron || !d.zurronLista) return;
     const claves = Object.keys(COSAS).filter(k => this.inventario[k] > 0);
     d.zurron.classList.toggle('on', claves.length > 0);
-    d.zurronLista.innerHTML = claves
-      .map(k => '<li title="' + COSAS[k].nombre + '">' + COSAS[k].emoji + '<b>' + this.inventario[k] + '</b></li>')
-      .join('');
+    const hayComida = claves.some(k => COSAS[k].alimenta);
+    d.zurronLista.innerHTML = claves.map(k => {
+      const c = COSAS[k], come = !!c.alimenta;
+      return '<li class="' + (come ? 'comible' : '') + '" data-cosa="' + k + '" title="' +
+             c.nombre + (come ? ' · toca para comértela' : '') + '">' +
+             c.emoji + '<b>' + this.inventario[k] + '</b></li>';
+    }).join('') + (hayComida ? '<span class="pista">Toca un bicho para comértelo</span>' : '');
+
+    // el taller sólo asoma cuando ya tienes con qué hacer algo
+    if (d.abrirTaller)
+      d.abrirTaller.classList.toggle('on', claves.length > 0 || this.fabricados.length > 0);
+    if (d.taller && d.taller.classList.contains('on')) this.pintarTaller();
+  }
+
+  /* ---- comerse un bicho del zurrón ---- */
+  comer(cosa) {
+    const c = COSAS[cosa];
+    if (!c || !c.alimenta || !(this.inventario[cosa] > 0)) return;
+    this.tocado();
+    this.inventario[cosa]--;
+    if (this.inventario[cosa] <= 0) delete this.inventario[cosa];
+    this.necesidades.hambre = clamp(this.necesidades.hambre + c.alimenta, 0, 100);
+    this.necesidades.diversion = clamp(this.necesidades.diversion + 3, 0, 100);
+    this.sonido.campanita();
+    if (this.persona) {
+      this.persona.emoji('😋');
+      setTimeout(() => { if (this.persona) this.persona.emoji(null); }, 2000);
+    }
+    this.texto(c.emoji + '  Se ha comido ' + c.nombre);
+    setTimeout(() => { if (this.dom.estado.textContent.indexOf('comido') >= 0) this.texto(''); }, 2400);
+    this.pintarInventario();
+    this.guardarPartida();
+  }
+
+  /* ================= el taller ================= */
+  verTaller(si) {
+    if (this.cargando) return;
+    const abierto = si === undefined ? !this.dom.taller.classList.contains('on') : si;
+    this.dom.taller.classList.toggle('on', abierto);
+    if (abierto) { this.tocado(); this.pintarTaller(); this.sonido.toque(); }
+  }
+
+  puedeHacer(r) {
+    return Object.keys(r.pide).every(k => (this.inventario[k] || 0) >= r.pide[k]);
+  }
+
+  pintarTaller() {
+    if (!this.dom.recetas) return;
+    this.dom.recetas.innerHTML = RECETAS.map(r => {
+      const hecha = this.fabricados.includes(r.id);
+      const puede = this.puedeHacer(r);
+      const pide = Object.keys(r.pide).map(k => {
+        const tengo = this.inventario[k] || 0, hace = r.pide[k];
+        return '<i class="' + (tengo >= hace ? '' : 'falta') + '">' + COSAS[k].emoji +
+               ' ' + tengo + '/' + hace + '</i>';
+      }).join('');
+      return '<div class="receta' + (hecha ? ' hecha' : '') + '">' +
+        '<div class="cara">' + r.emoji + '</div>' +
+        '<div class="txt"><div class="nom">' + r.nombre + '</div>' +
+        '<div class="dice">' + r.dice + '</div>' +
+        (hecha ? '' : '<div class="pide">' + pide + '</div>') + '</div>' +
+        (hecha ? '<div class="listo">✓ hecho</div>'
+               : '<button data-receta="' + r.id + '"' + (puede ? '' : ' disabled') + '>Hacer</button>') +
+        '</div>';
+    }).join('');
+  }
+
+  /* Monta el adorno y, si es de los que ocupan sitio, se lo dice a la navegación.
+     Se retoca la rejilla en vez de rehacerla: Nav.construir recorre el mundo entero
+     dos veces y son ~160 ms de parón, un tirón feo por poner una torre de piedras. */
+  ponerAdorno(r) {
+    this.casa.adorno(r.id, this.world);
+    if (r.estorba && this.nav) this.nav.bloquear(r.estorba[0], r.estorba[1], r.estorba[2], r.estorba[3]);
+  }
+
+  fabricar(id) {
+    const r = RECETAS.find(x => x.id === id);
+    if (!r || this.fabricados.includes(id) || !this.puedeHacer(r)) return false;
+    for (const k in r.pide) {
+      this.inventario[k] -= r.pide[k];
+      if (this.inventario[k] <= 0) delete this.inventario[k];
+    }
+    this.fabricados.push(id);
+    this.ponerAdorno(r);
+    this.sonido.fanfarria();
+    vibrar(18);
+    this.texto(r.emoji + '  ¡' + r.nombre + '! Ya está en su sitio');
+    setTimeout(() => { if (this.dom.estado.textContent.indexOf(r.nombre) >= 0) this.texto(''); }, 4000);
+    this.pintarInventario();
+    this.pintarTaller();
+    this.guardarPartida();
+    return true;
   }
 
   pintarUI(hora) {
