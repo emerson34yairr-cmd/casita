@@ -86,6 +86,117 @@ async function entrar(page) {
   ok('se puede andar por encima de ellas', navOrilla.bloqueadas.length === 0,
      navOrilla.bloqueadas.length ? `${navOrilla.bloqueadas.length} celdas bloqueadas` : 'ninguna estorba');
 
+  /* ============ 1b. las tres especies de árbol ============ */
+  const bosque = await page.evaluate(() => {
+    const B = { hoja: 7, pinocha: 10, troncoP: 11, palma: 12, coco: 13 };
+    const cuenta = { hoja: 0, pinocha: 0, troncoP: 0, palma: 0, coco: 0 };
+    // dónde crece cada especie: se mira la altura del suelo bajo cada tronco
+    const alturas = { frondoso: [], pino: [], palmera: [] };
+    for (const ch of juego.world.chunks.values()) {
+      if (!ch.data) continue;
+      for (let i = 0; i < ch.data.length; i++)
+        for (const k in B) if (ch.data[i] === B[k]) cuenta[k]++;
+    }
+    /* Para saber de qué especie es un árbol hay que mirar AL LADO del tronco, no la
+       columna central: el tronco se dibuja después de la copa y la pisa, así que en el
+       centro siempre hay madera por muy pino que sea. */
+    for (const a of juego.world.arboles) {
+      const bx = Math.floor(a.x), bz = Math.floor(a.z);
+      const h = juego.world.height(bx, bz);
+      let especie = null;
+      for (let dy = 2; dy <= 8 && !especie; dy++)
+        for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const v = juego.world.getBlock(bx + dx, h + dy, bz + dz);
+          if (v === 10) { especie = 'pino'; break; }
+          if (v === 7) { especie = 'frondoso'; break; }
+        }
+      if (especie) alturas[especie].push(h);
+    }
+    for (const p of juego.world.palmeras) alturas.palmera.push(juego.world.height(Math.floor(p.x), Math.floor(p.z)));
+    // objeto y no array con propiedades colgadas: page.evaluate serializa a JSON y
+    // las propiedades sueltas de un array se pierden por el camino
+    const rango = v => ({ n: v.length, min: v.length ? Math.min(...v) : null, max: v.length ? Math.max(...v) : null });
+    return { cuenta, palmeras: rango(alturas.palmera), pinos: rango(alturas.pino),
+             nPalm: juego.world.palmeras.length, nArb: juego.world.arboles.length };
+  });
+  ok('hay las tres especies en la isla',
+     bosque.cuenta.hoja > 500 && bosque.cuenta.pinocha > 500 && bosque.cuenta.palma > 50,
+     `hoja ${bosque.cuenta.hoja} · pinocha ${bosque.cuenta.pinocha} · palma ${bosque.cuenta.palma}`);
+  ok('las palmeras salen en la costa', bosque.palmeras.n > 5 && bosque.palmeras.max <= 13,
+     `${bosque.palmeras.n} palmeras, alturas ${bosque.palmeras.min}–${bosque.palmeras.max} (el mar está a 10)`);
+  ok('los pinos no bajan a la playa', bosque.pinos.n > 10 && bosque.pinos.min > 13,
+     `${bosque.pinos.n} pinos, alturas ${bosque.pinos.min}–${bosque.pinos.max}`);
+  ok('las palmeras llevan cocos', bosque.cuenta.coco > 0 && bosque.cuenta.troncoP > 50,
+     `${bosque.cuenta.coco} cocos en ${bosque.nPalm} palmeras apuntadas`);
+
+  /* Cada árbol UNA vez en la lista. plantTrees se llama por chunk y recorre una rejilla
+     que se mete en los vecinos, así que sin cuidado cada árbol se apunta 3 ó 4 veces —
+     y entonces "los 7 manzanos más cercanos" son 7 muebles encima de 2 árboles. */
+  const repetidos = await page.evaluate(() => {
+    const un = l => new Set(l.map(a => a.x + ',' + a.z)).size;
+    return {
+      arboles: [juego.world.arboles.length, un(juego.world.arboles)],
+      palmeras: [juego.world.palmeras.length, un(juego.world.palmeras)],
+      manzanos: [juego.casa.arboles.length, un(juego.casa.arboles)],
+      cocoteros: [juego.casa.cocoteros_.length, un(juego.casa.cocoteros_)],
+    };
+  });
+  const sinRepes = Object.values(repetidos).every(([n, u]) => n === u);
+  ok('ningún árbol se apunta dos veces', sinRepes,
+     Object.entries(repetidos).map(([k, [n, u]]) => `${k} ${n}/${u}`).join(' · '));
+
+  /* ============ 1c. coger un coco ============ */
+  const coco = await page.evaluate(() => {
+    const m = juego.casa.cocoteros_[0];
+    const bx = Math.floor(m.x), bz = Math.floor(m.z);
+    const cerca = () => [[1, 0], [0, 1], [-1, 0], [0, -1]]
+      .filter(([dx, dz]) => juego.world.getBlock(bx + dx, m.cocosY, bz + dz) === 13).length;
+    const antes = cerca();
+    juego.persona.x = m.anclaX; juego.persona.z = m.anclaZ;
+    juego.cogerCoco(m);
+    const trasCoger = { bloques: cerca(), inv: juego.inventario.coco || 0, maduro: m.maduro,
+                        texto: document.getElementById('estado').textContent };
+    juego.cogerCoco(m);                       // insistir no debe dar otro
+    const insistiendo = juego.inventario.coco || 0;
+    m.espera = 0; juego.frutaTick ? juego.frutaTick(1) : null;
+    return { antes, ...trasCoger, insistiendo, sitios: (m.sitiosCoco || []).length };
+  });
+  ok('la palmera tenía cocos puestos en el mundo', coco.antes > 0, `${coco.antes} bloques de coco`);
+  ok('coger un coco lo quita del árbol', coco.bloques === 0 && coco.sitios === coco.antes,
+     `${coco.antes} → ${coco.bloques} bloques`);
+  ok('y el coco va al zurrón', coco.inv === 1, coco.texto);
+  ok('insistir en la misma palmera no da otro', coco.insistiendo === 1);
+
+  const cocoVuelve = await page.evaluate(async () => {
+    const esperar = ms => new Promise(r => setTimeout(r, ms));
+    const m = juego.casa.cocoteros_[0];
+    const bx = Math.floor(m.x), bz = Math.floor(m.z);
+    m.espera = 0.2;                           // acelerar la espera de vuelta
+    const t0 = juego.tiempo;
+    while (!m.maduro && juego.tiempo - t0 < 20) await esperar(200);
+    return { maduro: m.maduro, bloques: [[1, 0], [0, 1], [-1, 0], [0, -1]]
+      .filter(([dx, dz]) => juego.world.getBlock(bx + dx, m.cocosY, bz + dz) === 13).length };
+  });
+  ok('los cocos vuelven a salir solos', cocoVuelve.maduro && cocoVuelve.bloques > 0,
+     `${cocoVuelve.bloques} bloques de vuelta`);
+
+  const cocoSeCome = await page.evaluate(() => {
+    juego.inventario = { coco: 1 }; juego.necesidades.hambre = 20;
+    juego.pintarInventario();
+    const esComible = !!document.querySelector('#zurron li.comible[data-cosa="coco"]');
+    juego.comer('coco');
+    return { esComible, hambre: Math.round(juego.necesidades.hambre), queda: juego.inventario.coco };
+  });
+  ok('el coco se come desde el zurrón', cocoSeCome.esComible && cocoSeCome.hambre === 36 && !cocoSeCome.queda,
+     `hambre 20 → ${cocoSeCome.hambre}`);
+
+  const conchasLibres = await page.evaluate(() => juego.casa.conchas.filter(m => {
+    const h = juego.world.height(Math.floor(m.x), Math.floor(m.z));
+    return juego.world.getBlock(Math.floor(m.x), h + 1, Math.floor(m.z)) !== 0;
+  }).length);
+  ok('ninguna concha quedó dentro de un tronco de palmera', conchasLibres === 0,
+     conchasLibres ? `${conchasLibres} atrapadas` : 'las 48 al aire libre');
+
   /* ============ 2. recoger suma al zurrón ============ */
   const recogida = await page.evaluate(() => {
     const m = juego.casa.conchas.find(c => !c.recogida);

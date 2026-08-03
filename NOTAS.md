@@ -135,6 +135,40 @@ espere algo del juego tiene que mirar `juego.tiempo`, no contar segundos reales.
 un rato persiguiendo un fallo de la autonomía del gato que no existía: era la prueba, que
 esperaba 23 s reales creyendo que eran 23 s de juego (eran 4).
 
+## Los árboles se apuntaban tres veces (bug viejo)
+
+`plantTrees` se llama **por cada chunk** y recorre una rejilla de celdas que se mete en
+los vecinos, para que los árboles que caen en un borde salgan enteros. `put()` recorta los
+bloques que no son de este chunk — pero el `arboles.push` no se recortaba, así que cada
+árbol acababa en la lista tres o cuatro veces: **871 apuntes para 251 árboles**.
+
+Se notaba de verdad, y llevaba así desde siempre: `manzanos()` coge "los 7 más cercanos" y
+eran **7 muebles encima de 2 árboles**, con cinco racimos de manzanas superpuestos en el
+mismo sitio y seis avisos de fruta madura por árbol.
+
+El arreglo es una línea: el tronco sólo cae en un chunk, y ése es el dueño del apunte
+(`suyo`). Si algún día se apunta otra cosa desde `plantTrees`, acordarse.
+
+## Las tres especies de árbol
+
+Cada una donde le toca, no repartidas al azar: al azar por toda la isla quedaba a puré.
+
+| | Dónde | Cómo |
+|---|---|---|
+| Frondoso | en medio | copa redonda, `WOOD` + `LEAVES` |
+| Pino | `h >= SEA_LEVEL+11`, y un 26 % del bosque | cono a pisos, más alto, `PINOCHA` |
+| Palmera | `h <= SEA_LEVEL+3` (la costa) | tronco pelado + penacho, `TRONCO_P` + `PALMA` |
+
+**Para saber de qué especie es un árbol hay que mirar AL LADO del tronco.** El tronco se
+dibuja después de la copa y la pisa, así que en la columna central siempre hay madera por
+muy pino que sea. Una prueba se pasó un rato diciendo que no había pinos por esto.
+
+Los cocos son **bloques del mundo** (`COCO`), no una malla colgada como las manzanas: al
+coger uno desaparece del árbol de verdad. Eso pidió un `World.setBlock` que no existía.
+**Ojo al chunk vecino**: la malla de cada uno mira una capa de bloques de alrededor
+(`fillPadded`), así que tocar un bloque del borde deja al de al lado con un agujero o una
+cara de más. `setBlock` lo remalla si hace falta.
+
 ## Dos trampas de Nav que costaron sangre
 
 **Un "mueble" hace más de lo que parece.** Las cosas de la orilla se montaron como
@@ -212,6 +246,10 @@ cada partida para poder guardar "la número 7 ya la recogí".
 - [x] ~~Guardar también el huerto~~ — hecho, en el formato v:3.
 - [x] ~~Que lo del zurrón sirva para algo~~ — hecho: los bichos se comen tocándolos, y con
       conchas, piedras, estrellas y el tesoro se fabrican cinco adornos para la casa.
+- [x] ~~Árboles de más de una clase, y uno con fruta~~ — hecho: pinos, palmeras y el
+      frondoso de siempre; las palmeras dan cocos.
+- [ ] **Una receta que use cocos**: son la única cosa del zurrón que no sirve para
+      fabricar. Una maceta, o un cuenco.
 - [ ] **Más recetas**: ahora son cinco y se acaban. Un banco para el porche, una alfombra,
       un farol para dentro. Añadir una es una entrada en `RECETAS` y su rama en
       `Casa.adorno()`.

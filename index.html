@@ -449,19 +449,27 @@ const CASA = { x: 0, z: 0, w: 15, d: 11, alto: 3.3, muro: 0.28 };
 const PATIO = { x: 9.5, z: 7.5, suave: 5 };   // explanada plana alrededor
 
 const AIR = 0, GRASS = 1, DIRT = 2, STONE = 3, SAND = 4, WATER = 5, WOOD = 6, LEAVES = 7, PATH = 8, FLOWERS = 9;
+// las tres especies de árbol: el frondoso de siempre (WOOD + LEAVES), el pino y la palmera
+const PINOCHA = 10, TRONCO_P = 11, PALMA = 12, COCO = 13;
 
 // tiles del atlas: 0 pasto 1 pasto_lado 2 tierra 3 piedra 4 arena
 //                  5 agua 6 tronco_lado 7 tronco_arriba 8 hojas 9 camino 10 pasto_flores
+//                  11 yeso 12 teja 13 duela 14 tabla 15 tela 16 liso
+//                  17 pinocha 18 tronco_palmera 19 palma 20 coco
 const BLOCKS = {
-  [GRASS]:   { top:0,  side:1, bottom:2 },
-  [DIRT]:    { top:2,  side:2, bottom:2 },
-  [STONE]:   { top:3,  side:3, bottom:3 },
-  [SAND]:    { top:4,  side:4, bottom:4 },
-  [WATER]:   { top:5,  side:5, bottom:5 },
-  [WOOD]:    { top:7,  side:6, bottom:7 },
-  [LEAVES]:  { top:8,  side:8, bottom:8 },
-  [PATH]:    { top:9,  side:9, bottom:9 },
-  [FLOWERS]: { top:10, side:1, bottom:2 }
+  [GRASS]:    { top:0,  side:1,  bottom:2 },
+  [DIRT]:     { top:2,  side:2,  bottom:2 },
+  [STONE]:    { top:3,  side:3,  bottom:3 },
+  [SAND]:     { top:4,  side:4,  bottom:4 },
+  [WATER]:    { top:5,  side:5,  bottom:5 },
+  [WOOD]:     { top:7,  side:6,  bottom:7 },
+  [LEAVES]:   { top:8,  side:8,  bottom:8 },
+  [PATH]:     { top:9,  side:9,  bottom:9 },
+  [FLOWERS]:  { top:10, side:1,  bottom:2 },
+  [PINOCHA]:  { top:17, side:17, bottom:17 },
+  [TRONCO_P]: { top:7,  side:18, bottom:7 },
+  [PALMA]:    { top:19, side:19, bottom:19 },
+  [COCO]:     { top:20, side:20, bottom:20 }
 };
 
 // ¿pantalla táctil? ¿teléfono? (ajusta calidad y controles)
@@ -490,7 +498,8 @@ const COSAS = {
   pulpo:    { emoji: '🐙', nombre: 'un pulpo',       alimenta: 34 },
   globo:    { emoji: '🐡', nombre: 'un pez globo' },   // mejor no comérselo
   bota:     { emoji: '🥾', nombre: 'una bota vieja' },
-  tesoro:   { emoji: '💎', nombre: 'un tesoro' }
+  tesoro:   { emoji: '💎', nombre: 'un tesoro' },
+  coco:     { emoji: '🥥', nombre: 'un coco',        alimenta: 16 }
 };
 
 /* Lo que se puede hacer con lo que juntas. Cada cosa se hace UNA vez: son adornos
@@ -604,7 +613,9 @@ class Assets {
       this.tile(this.troncoLado),  this.tile(this.troncoArriba), this.tile(this.hojas),
       this.tile(this.camino),      this.tile(this.flores),
       this.tile(this.yeso),        this.tile(this.teja),      this.tile(this.duela),
-      this.tile(this.tabla),       this.tile(this.tela),      this.tile(this.liso)
+      this.tile(this.tabla),       this.tile(this.tela),      this.tile(this.liso),
+      this.tile(this.pinocha),     this.tile(this.troncoPalmera),
+      this.tile(this.palma),       this.tile(this.coco)
     ];
     this.buildAtlas();
     this.buildUVs();
@@ -664,6 +675,34 @@ class Assets {
     Assets.fill(g, rnd, ['#8FBE86', '#9BC993', '#83B27A', '#A7D49E', '#79A771']);
     for (let i = 0; i < 16; i++) Assets.px(g, Math.floor(rnd() * 16), Math.floor(rnd() * 16), '#6C9865');
   }
+  /* --- las dos especies nuevas ---
+     La pinocha va más oscura y más azulada que la hoja normal: desde arriba, que es
+     como se ve casi siempre, el color es lo único que distingue una copa de otra. */
+  pinocha(g, rnd) {
+    Assets.fill(g, rnd, ['#5E8A62', '#548059', '#69946C', '#4A7351', '#628F66']);
+    // pinchos: rayitas cortas más claras, para que no sea una mancha lisa
+    for (let i = 0; i < 22; i++) {
+      const x = Math.floor(rnd() * 16), y = Math.floor(rnd() * 15);
+      Assets.px(g, x, y, '#7BA37D'); Assets.px(g, x, y + 1, '#7BA37D');
+    }
+  }
+  troncoPalmera(g, rnd) {
+    Assets.fill(g, rnd, ['#BFA07A', '#B59571', '#C9AB85']);
+    // los anillos que le deja a la palmera cada hoja que se le cae
+    for (let y = 1; y < 16; y += 3)
+      for (let x = 0; x < 16; x++) if (rnd() > 0.25) Assets.px(g, x, y, '#9C7F5E');
+  }
+  palma(g, rnd) {
+    Assets.fill(g, rnd, ['#8CC47E', '#7CB66F', '#9AD08B', '#71A867']);
+    // el nervio de la hoja, cruzándola entera
+    for (let x = 0; x < 16; x++) Assets.px(g, x, 8, '#5E9457');
+    for (let i = 0; i < 14; i++) Assets.px(g, Math.floor(rnd() * 16), Math.floor(rnd() * 16), '#A8DC99');
+  }
+  coco(g, rnd) {
+    Assets.fill(g, rnd, ['#8A6242', '#7C583B', '#966D4B']);
+    for (let i = 0; i < 20; i++) Assets.px(g, Math.floor(rnd() * 16), Math.floor(rnd() * 16), '#6B4A31');
+  }
+
   camino(g, rnd) {
     Assets.fill(g, rnd, ['#C7B695', '#D0C2A3', '#BCAA8B']);
     for (let i = 0; i < 26; i++) Assets.px(g, Math.floor(rnd() * 16), Math.floor(rnd() * 16), '#CFBDA0');
@@ -979,6 +1018,7 @@ class World {
     this.seed = seed;
     this.chunks = new Map();
     this.arboles = [];            // dónde quedó cada árbol (para colgarles manzanas)
+    this.palmeras = [];           // y cada palmera con cocos, para poder cogerlos
     this.pad = new Uint8Array(PX * PY * PZ);
     this.padMaxY = WORLD_HEIGHT - 1;
     this.ao4 = new Uint8Array(4);
@@ -1109,22 +1149,82 @@ class World {
         const tx = gx * CELL + Math.floor(hash01(gx, gz, this.seed + 7) * CELL);
         const tz = gz * CELL + Math.floor(hash01(gx, gz, this.seed + 13) * CELL);
         if (this.enCasa(tx, tz, 6)) continue;                       // deja libre el jardín
-        if (Math.hypot(tx, tz) > ISLA_R - 8) continue;              // ni en la orilla
+        if (Math.hypot(tx, tz) > ISLA_R - 1) continue;              // ni fuera de la isla
         const h = this.height(tx, tz);
-        if (h <= SEA_LEVEL + 1) continue;
-        const alto = 4 + Math.floor(hash01(gx, gz, this.seed + 23) * 2);
+        if (h <= SEA_LEVEL) continue;                               // ni en el agua
 
-        // copa redonda
-        for (let dy = alto - 2; dy <= alto + 2; dy++) {
-          const r = (dy === alto - 2 || dy === alto + 1) ? 2 : (dy === alto + 2 ? 1 : 2.4);
-          for (let dz = -3; dz <= 3; dz++) for (let dx = -3; dx <= 3; dx++) {
-            if (Math.hypot(dx, dz) > r) continue;
-            put(tx + dx, h + dy, tz + dz, LEAVES, true);
+        /* Tres especies, cada una donde le toca. Repartirlas al azar por toda la isla
+           quedaba a puré: la palmera pide arena y el pino, altura. Así se lee de un
+           vistazo dónde estás — playa, bosque o cerro. */
+        const costa = h <= SEA_LEVEL + 3;      // la franja de arena y el primer repecho
+        const cerro = h >= SEA_LEVEL + 11;
+        const especie = costa ? 'palmera'
+                      : cerro ? 'pino'
+                      : (hash01(gx, gz, this.seed + 41) < 0.26 ? 'pino' : 'frondoso');
+        const alto = 4 + Math.floor(hash01(gx, gz, this.seed + 23) * 2);
+        // ¿es este chunk el dueño del árbol? (el tronco sólo cae en uno)
+        const suyo = tx >= ox && tx < ox + CHUNK_SIZE && tz >= oz && tz < oz + CHUNK_SIZE;
+
+        if (especie === 'frondoso') {
+          // copa redonda
+          for (let dy = alto - 2; dy <= alto + 2; dy++) {
+            const r = (dy === alto - 2 || dy === alto + 1) ? 2 : (dy === alto + 2 ? 1 : 2.4);
+            for (let dz = -3; dz <= 3; dz++) for (let dx = -3; dx <= 3; dx++) {
+              if (Math.hypot(dx, dz) > r) continue;
+              put(tx + dx, h + dy, tz + dz, LEAVES, true);
+            }
           }
+          for (let dy = 1; dy <= alto; dy++) put(tx, h + dy, tz, WOOD, false);
+
+        } else if (especie === 'pino') {
+          // cono a pisos: ancho abajo y en punta arriba, y más alto que el frondoso
+          const altoP = alto + 2 + Math.floor(hash01(gx, gz, this.seed + 57) * 3);
+          for (let dy = 2; dy <= altoP + 1; dy++) {
+            const f = (dy - 2) / (altoP - 1);              // 0 en la base de la copa, 1 en la punta
+            const r = 2.6 * (1 - f) + 0.2;
+            if (dy > altoP - 1) { put(tx, h + dy, tz, PINOCHA, true); continue; }
+            for (let dz = -3; dz <= 3; dz++) for (let dx = -3; dx <= 3; dx++) {
+              if (Math.hypot(dx, dz) > r) continue;
+              put(tx + dx, h + dy, tz + dz, PINOCHA, true);
+            }
+          }
+          for (let dy = 1; dy <= altoP; dy++) put(tx, h + dy, tz, WOOD, false);
+
+        } else {
+          /* palmera: tronco pelado y un penacho de hojas arriba. Las de la orilla son
+             las que dan cocos, y por eso van apuntadas aparte. */
+          const altoM = 5 + Math.floor(hash01(gx, gz, this.seed + 71) * 3);
+          for (let dy = 1; dy <= altoM; dy++) put(tx, h + dy, tz, TRONCO_P, false);
+          const cima = h + altoM;
+          put(tx, cima + 1, tz, PALMA, true);
+          for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+            put(tx + dx, cima + 1, tz + dz, PALMA, true);      // el arranque de cada hoja
+            put(tx + dx * 2, cima + 1, tz + dz * 2, PALMA, true);
+            put(tx + dx * 3, cima, tz + dz * 3, PALMA, true);  // la punta, que cae
+          }
+          for (const [dx, dz] of [[1, 1], [1, -1], [-1, 1], [-1, -1]])
+            put(tx + dx, cima, tz + dz, PALMA, true);
+          // los cocos, colgando justo bajo el penacho
+          const cuantos = Math.floor(hash01(gx, gz, this.seed + 83) * 3);   // 0, 1 ó 2
+          const sitios = [[1, 0], [0, 1], [-1, 0], [0, -1]];
+          for (let k = 0; k < cuantos; k++) {
+            const [dx, dz] = sitios[(gx + gz + k) & 3];
+            put(tx + dx, cima, tz + dz, COCO, true);
+          }
+          if (cuantos && suyo && this.palmeras.length < 400)
+            this.palmeras.push({ x: tx + 0.5, z: tz + 0.5, y: h, alto: altoM, cocos: cuantos });
         }
-        for (let dy = 1; dy <= alto; dy++) put(tx, h + dy, tz, WOOD, false);
-        // apuntar el árbol: los de cerca de casa llevarán manzanas
-        if (this.arboles.length < 2000) this.arboles.push({ x: tx + 0.5, z: tz + 0.5, y: h, alto: alto });
+
+        /* Apuntar el árbol, UNA sola vez.
+           plantTrees se llama por cada chunk y recorre una rejilla que se mete en los
+           vecinos, para que los árboles del borde salgan enteros: put() recorta lo que
+           no cae en este chunk, pero el apunte no se recortaba y cada árbol acababa en
+           la lista tres o cuatro veces. Se notaba de verdad: manzanos() cogía "los 7
+           más cercanos" y eran 7 muebles encima de 2 árboles, con cinco racimos de
+           manzanas superpuestos y seis avisos de fruta madura por árbol.
+           El tronco sólo cae en un chunk: ése es el dueño del apunte. */
+        if (especie !== 'palmera' && suyo && this.arboles.length < 2000)
+          this.arboles.push({ x: tx + 0.5, z: tz + 0.5, y: h, alto: alto });
       }
     }
   }
@@ -1149,6 +1249,31 @@ class World {
     const c = this.getChunk(cx, cz, true);
     if (!c || !c.data) return AIR;
     return c.data[IDX(wx - cx * CHUNK_SIZE, wy, wz - cz * CHUNK_SIZE)];
+  }
+
+  /* Cambia un bloque y vuelve a mallar. Lo usan los cocos al cogerlos: son bloques
+     del mundo, no una malla colgada aparte como las manzanas.
+
+     Ojo al chunk vecino: la malla de cada uno mira una capa de bloques de alrededor
+     (fillPadded), así que tocar un bloque del borde deja al de al lado desactualizado
+     — se le ve un agujero o una cara de más. */
+  setBlock(wx, wy, wz, id) {
+    if (wy < 0 || wy >= WORLD_HEIGHT) return false;
+    const cx = Math.floor(wx / CHUNK_SIZE), cz = Math.floor(wz / CHUNK_SIZE);
+    const c = this.getChunk(cx, cz, true);
+    if (!c || !c.data) return false;
+    const lx = wx - cx * CHUNK_SIZE, lz = wz - cz * CHUNK_SIZE;
+    const i = IDX(lx, wy, lz);
+    if (c.data[i] === id) return false;
+    c.data[i] = id;
+    this.buildMesh(c);
+    for (const [dx, dz] of [[lx === 0 ? -1 : (lx === CHUNK_SIZE - 1 ? 1 : 0), 0],
+                            [0, lz === 0 ? -1 : (lz === CHUNK_SIZE - 1 ? 1 : 0)]]) {
+      if (!dx && !dz) continue;
+      const v = this.getChunk(cx + dx, cz + dz, false);
+      if (v && v.data && v.mesh) this.buildMesh(v);
+    }
+    return true;
   }
   /* ---------- malla ---------- */
   fillPadded(chunk) {
@@ -1811,6 +1936,8 @@ class Casa {
       if (world.height(Math.floor(px), Math.floor(pz)) !== SEA_LEVEL + 1) { px = s.x; pz = s.z; }
       const h = world.height(Math.floor(px), Math.floor(pz));
       if (h !== SEA_LEVEL + 1) continue;
+      // ahora hay palmeras en la arena: una concha dentro de un tronco no se ve ni se coge
+      if (world.getBlock(Math.floor(px), h + 1, Math.floor(pz)) !== AIR) continue;
       const y = h + 1;
 
       const clase = clases[Math.floor(hash01(i, 4, SEMILLA) * clases.length)];
@@ -1853,6 +1980,33 @@ class Casa {
       m.grupo.add(c.malla(this.material()));
       this.muebles.push(m);
       this.conchas.push(m);
+      this.grupo.add(m.grupo);
+    }
+  }
+
+  /* ---------------- cocoteros: las palmeras de las que se pueden coger cocos ----------------
+     No todas: sólo unas cuantas de las que caen a mano desde casa, porque cada una es
+     un mueble más que mirar en cada clic. Igual que los manzanos, pero el coco va al
+     zurrón en vez de comerse ahí mismo. */
+  cocoteros(world) {
+    this.cocoteros_ = [];
+    const cerca = (world.palmeras || [])
+      .slice()
+      .sort((p, q) => Math.hypot(p.x - CASA.x, p.z - CASA.z) - Math.hypot(q.x - CASA.x, q.z - CASA.z))
+      .slice(0, ES_MOVIL ? 8 : 12);
+    for (const a of cerca) {
+      const m = new Mueble({
+        nombre: 'Cocotero', emoji: '🥥', accion: 'cogiendo cocos', verbo: 'Coger un coco',
+        tipo: 'cocotero', x: a.x, z: a.z,
+        anclaX: a.x, anclaZ: a.z + 2.1, mirar: Math.PI,
+        rect: [a.x - 0.9, a.z - 0.9, a.x + 0.9, a.z + 0.9],
+        // el tronco ya es un bloque sólido: la rejilla lo tiene fichado sin ayuda, y
+        // marcarlo como mueble normal le pondría la altura de la duela de casa a la arena
+        noEstorba: true,
+        maduro: true, espera: 0, cocosY: a.y + a.alto
+      });
+      this.muebles.push(m);
+      this.cocoteros_.push(m);
       this.grupo.add(m.grupo);
     }
   }
@@ -3937,6 +4091,7 @@ class Juego {
     this.casa = new Casa(this.scene, this.assets);
     this.casa.manzanos(this.world);
     this.casa.muelle(this.world);
+    this.casa.cocoteros(this.world);
     this.casa.orilla(this.world);
     this.ambiente.humoDesde(this.casa.chimenea);
     this.nav = new Nav();
@@ -4089,7 +4244,8 @@ class Juego {
   }
   usar(m) {
     this.tocado();
-    if (m.tipo === 'huerto' || m.tipo === 'manzano' || m.tipo === 'pesca' || m.tipo === 'orilla')
+    if (m.tipo === 'huerto' || m.tipo === 'manzano' || m.tipo === 'pesca' ||
+        m.tipo === 'orilla' || m.tipo === 'cocotero')
       return this.usarFuera(m);
     this.parar(true);
     this.sonido.toque();
@@ -4478,7 +4634,8 @@ class Juego {
     this.parar(true);
     this.sonido.toque();
     this.camara.seguir = true;
-    const adonde = { huerto: 'al huerto…', manzano: 'al manzano…', pesca: 'a pescar…', orilla: 'a la orilla…' };
+    const adonde = { huerto: 'al huerto…', manzano: 'al manzano…', pesca: 'a pescar…',
+                     orilla: 'a la orilla…', cocotero: 'a la palmera…' };
     this.texto('Va ' + (adonde[m.tipo] || 'para allá…'));
     this.persona.irA(m.anclaX, m.anclaZ, () => {
       const p = this.persona;
@@ -4486,6 +4643,7 @@ class Juego {
       if (m.tipo === 'manzano') this.cogerManzana(m);
       else if (m.tipo === 'pesca') this.pescar(m);
       else if (m.tipo === 'orilla') this.recogerDeOrilla(m);
+      else if (m.tipo === 'cocotero') this.cogerCoco(m);
       else this.tocarParcela(m);
     });
   }
@@ -4593,6 +4751,48 @@ class Juego {
     setTimeout(() => { p.emoji(null); this.texto(''); }, 2800);
   }
 
+  /* ---- coger un coco de la palmera ----
+     A diferencia de la manzana, que se come ahí mismo, el coco va al zurrón: es de las
+     cosas que se guardan, y así se puede comer luego cuando aprieta el hambre. */
+  cogerCoco(m) {
+    const p = this.persona;
+    if (!m.maduro) {
+      p.emoji('⏳');
+      this.texto('Esta palmera ya no tiene cocos. Volverán a salir');
+      setTimeout(() => { p.emoji(null); this.texto(''); }, 2400);
+      return;
+    }
+    m.maduro = false;
+    m.espera = 120 + Math.random() * 80;
+    this.quitarCocos(m);
+    this.sonido.recogida();
+    p.emoji('🥥');
+    this.necesidades.diversion = clamp(this.necesidades.diversion + 7, 0, 100);
+    const llevas = this.anotar('coco');
+    this.texto('🥥  Un coco' + (llevas > 1 ? ' · llevas ' + llevas : '') + '. Se come desde el zurrón');
+    setTimeout(() => { p.emoji(null); this.texto(''); }, 3000);
+  }
+
+  /* Los cocos son bloques del mundo, no una malla suelta como las manzanas: para
+     quitarlos (y devolverlos) hay que tocar el chunk y pedir que se vuelva a mallar. */
+  ponerCocos(m, si) {
+    const bx = Math.floor(m.x), bz = Math.floor(m.z), y = m.cocosY;
+    let tocado = false;
+    for (const [dx, dz] of [[1, 0], [0, 1], [-1, 0], [0, -1]]) {
+      const hay = this.world.getBlock(bx + dx, y, bz + dz);
+      if (si && hay === AIR && m.sitiosCoco && m.sitiosCoco.some(s => s[0] === dx && s[1] === dz)) {
+        this.world.setBlock(bx + dx, y, bz + dz, COCO); tocado = true;
+      } else if (!si && hay === COCO) {
+        if (!m.sitiosCoco) m.sitiosCoco = [];
+        m.sitiosCoco.push([dx, dz]);
+        this.world.setBlock(bx + dx, y, bz + dz, AIR); tocado = true;
+      }
+    }
+    return tocado;
+  }
+  quitarCocos(m) { m.sitiosCoco = []; this.ponerCocos(m, false); }
+  devolverCocos(m) { this.ponerCocos(m, true); }
+
   tocarParcela(m) {
     const p = this.persona;
     if (m.estado === 0) {                     // tierra vacía: sembrar
@@ -4644,6 +4844,12 @@ class Juego {
       if (a.maduro) continue;
       a.espera -= dt;
       if (a.espera <= 0) { a.maduro = true; a.frutas.visible = true; }
+    }
+    // los cocos tardan un poco más, y hay que devolverlos al mundo bloque a bloque
+    for (const m of this.casa.cocoteros_ || []) {
+      if (m.maduro) continue;
+      m.espera -= dt;
+      if (m.espera <= 0) { m.maduro = true; this.devolverCocos(m); }
     }
   }
 

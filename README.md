@@ -10,7 +10,10 @@ y se ve a pantalla completa (el propio juego te lo recuerda la primera vez).
 
 ## Qué hay
 
-- Isla de voxels generada por procedimiento, con su mar, sus árboles y su playa
+- Isla de voxels generada por procedimiento, con su mar y su playa
+- **Tres clases de árbol**, cada una en su sitio: frondosos en el bosque, **pinos** en los
+  cerros y **palmeras** en la costa. Las palmeras dan **cocos**: los coges del árbol (y se
+  le quitan de verdad), van al zurrón, y vuelven a salir solos al cabo de un rato
 - **El gato va a lo suyo**: si lo dejas un rato se busca la vida según lo que necesite —
   se va a dormir, come, se arrima al fuego, toma el sol, se queda mirando el mar o pasea.
   En cuanto tocas algo, suelta y te obedece
