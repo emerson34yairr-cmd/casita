@@ -11,13 +11,21 @@ y se ve a pantalla completa (el propio juego te lo recuerda la primera vez).
 ## Qué hay
 
 - Isla de voxels generada por procedimiento, con su mar, sus árboles y su playa
+- **El gato va a lo suyo**: si lo dejas un rato se busca la vida según lo que necesite —
+  se va a dormir, come, se arrima al fuego, toma el sol, se queda mirando el mar o pasea.
+  En cuanto tocas algo, suelta y te obedece
 - Casa con muebles usables: cama, cocina, sofá, tele, mesa y **hogar encendido**
 - **Huerto**: se siembra, se riega y se cosecha (si llueve, se riega solo)
 - **Manzanos** con fruta que vuelve a salir
-- **Muelle para pescar**: echas el sedal, esperas, y cuando pica hay que recoger a tiempo
+- **Muelle para pescar**: echas el sedal, esperas, y cuando pica hay que recoger a tiempo.
+  Sale de todo: sardinas, doradas, gambas, algún pulpo, una bota vieja… y muy de vez en
+  cuando un tesoro
+- **Cosas en la orilla**: conchas, piedras y estrellas de mar repartidas por toda la playa,
+  para recoger. Lo que juntas se ve en el zurrón y se guarda
 - Ciclo de día y noche con luciérnagas, estrellas y las ventanas encendidas
 - **Chimenea con humo**, mariposas, nubes y **chubascos** de vez en cuando
-- Sonido ambiente sintetizado: viento, pájaros de día, grillos de noche, lluvia
+- Sonido ambiente sintetizado: viento, pájaros de día, grillos de noche, lluvia, y **pasos
+  que suenan distinto** según pises hierba, arena, madera o el filo del agua
 - **Modo foto** (tecla O): se va la interfaz y quedan bandas de cine
 - La partida **se guarda sola** y se pausa cuando cambias de pestaña
 
@@ -58,8 +66,14 @@ CDN), así que el archivo funciona solo: lo abres y ya está, sin servidor ni in
   una app de verdad: icono propio, pantalla completa y, sobre todo, que **se actualice sola**
 - `NOTAS.md` — cómo funciona por dentro, los tropiezos que ya están resueltos, y lo que falta
 
-Para reconstruir `index.html` a partir del fuente solo hay que meter three.js r128 dentro.
-Está explicado en `NOTAS.md`.
+Para reconstruir `index.html` a partir del fuente:
+
+```sh
+./.build/construir.sh      # y para comprobar que no se rompió nada:
+node .build/revisar.js     # sintaxis
+node .build/probar.js      # que el juego arranca de verdad en un navegador
+node .build/pruebas.js     # que la orilla, la pesca, el guardado y el gato hacen lo suyo
+```
 
 ## Deploy
 

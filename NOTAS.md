@@ -113,15 +113,66 @@ para que salga de bloques como el juego.
 `sw.js` no se entera. Hay que borrarlo de la pantalla y volver a añadirlo una vez; a partir
 de ahí se actualiza solo.
 
+## Cómo se compila y cómo se prueba (nuevo)
+
+`casita-fuente.html` es **lo único que se edita**. `index.html` se genera:
+
+```sh
+./.build/construir.sh          # mete three.js incrustado y escribe index.html
+node .build/revisar.js         # sintaxis de los <script> de dentro
+node .build/probar.js          # abre el juego en Chromium de verdad y mira si peta
+node .build/pruebas.js         # las pruebas de las cosas: orilla, pesca, guardado, gato
+```
+
+Lo único que hace `construir.sh` es sustituir la etiqueta del CDN de three.js por la
+librería entera (`.build/three-inline.html`). Comprobado: partiendo del fuente sin tocar,
+reproduce el `index.html` publicado byte por byte.
+
+**Trampa de las pruebas en Chromium:** aquí no hay tarjeta gráfica, se renderiza por
+software a pocos fotogramas por segundo, y el bucle topa `dt` a 0,1 s. Resultado: el reloj
+**del juego** avanza unas 4 veces más despacio que el de la pared. Cualquier prueba que
+espere algo del juego tiene que mirar `juego.tiempo`, no contar segundos reales. Se perdió
+un rato persiguiendo un fallo de la autonomía del gato que no existía: era la prueba, que
+esperaba 23 s reales creyendo que eran 23 s de juego (eran 4).
+
+## El zurrón y el guardado v3
+
+El formato de `casita_partida` pasó de `v:2` a `v:3`. Lo nuevo: `h` (el huerto, parcela a
+parcela), `i` (el zurrón) y `c` (qué cosas de la orilla ya se recogieron, por su número).
+
+**Una partida `v:2` tiene que seguir cargando**, con el huerto sin plantar y el zurrón
+vacío. Cada bloque de `restaurarPartida` comprueba antes de tocar nada, y hay pruebas que
+meten a mano una partida vieja, una partida a medias y una partida con basura dentro.
+
+Todo lo que se recoja o se pesque **tiene que pasar por `juego.anotar(cosa)`**: es lo único
+que suma al zurrón, repinta el panel y guarda. Si algo suma por su cuenta, no se guardará.
+Las claves del inventario son las de `COSAS`: cambiarle el nombre a una rompe las partidas
+guardadas, añadir una nueva no.
+
+## Cosas de la orilla
+
+La arena que asoma del agua es una franja de **un bloque de alto** (`h === SEA_LEVEL + 1`;
+por encima ya es hierba), y la costa ondula ±22 bloques. Buscar sitio a radio fijo dejaba
+media playa vacía: salían 14 de 48 y agrupadas en 9 de los 16 sectores. Ahora se recorre el
+contorno entero (720 ángulos) apuntando dónde hay arena, y luego se reparten las cosas por
+esa lista.
+
+El sitio de cada una sale de `hash01`, **no de `Math.random`**: tiene que ser el mismo en
+cada partida para poder guardar "la número 7 ya la recogí".
+
 ## Lo que voy a hacer (por orden)
 
-- [ ] **Que el gato haga cosas solo** cuando no lo controlas: dormir si tiene sueño, ir a
-      comer, tumbarse al sol. Ahora se queda quieto y se nota.
-- [ ] **Recoger conchas y piedras en la playa**, que la orilla está vacía y es lo más bonito
-      de la isla.
-- [ ] **Que la pesca dé cosas distintas** (peces, una bota, un tesoro) y llevar la cuenta.
-- [ ] **Guardar también el huerto** en la partida: ahora se guardan hora, necesidades y dónde
-      estabas, pero las parcelas vuelven a empezar vacías.
+- [x] ~~Que el gato haga cosas solo~~ — hecho: tras 8 s sin que toques nada elige según sus
+      necesidades (dormir, comer, arrimarse al fuego, sofá, tomar el sol, mirar el mar,
+      pasear), con pesos y sin repetir lo anterior. **La regla que manda: en cuanto tocas
+      algo, `tocado()` lo corta en el mismo fotograma.** Si estaba tumbado, se levanta —
+      sin eso se deslizaba por el suelo en postura de dormir.
+- [x] ~~Recoger conchas y piedras en la playa~~ — hecho: conchas, piedras y estrellas de mar.
+- [x] ~~Que la pesca dé cosas distintas~~ — hecho: cinco bichos, la bota y el tesoro (3 %).
+- [x] ~~Guardar también el huerto~~ — hecho, en el formato v:3.
+- [ ] **Que el gato use también las cosas del zurrón**: ahora se juntan conchas y peces y no
+      sirven para nada más que para contarlos. Un peces→comida, o adornar la casa con lo
+      que encuentras, sería lo siguiente.
 - [ ] **Más muebles usables**: estantería para leer, ducha, escritorio.
 - [ ] **Estaciones o al menos un otoño**: las hojas de los árboles tirando a naranja según el día.
 - [ ] **Un diario de la casa**: "día 4, llovió, cosechaste dos tomates".

@@ -1,2 +1,5 @@
 *.zip
 _temp*
+# la copia suelta de three.js: ya va dentro de index.html, y construir.sh la saca de ahi
+.build/three-inline.html
+.build/capturas/
