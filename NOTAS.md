@@ -163,6 +163,25 @@ Cada una donde le toca, no repartidas al azar: al azar por toda la isla quedaba 
 dibuja después de la copa y la pisa, así que en la columna central siempre hay madera por
 muy pino que sea. Una prueba se pasó un rato diciendo que no había pinos por esto.
 
+**El pino salió del revés a la primera, y se veía.** Dos cosas hay que respetar o el árbol
+parece un palo clavado en un montón de hojas:
+
+1. La copa **no puede arrancar del suelo**: `BASE = 3` deja dos bloques de tronco a la vista.
+2. El tronco **no puede pasar de donde la copa aún lo tapa**: llega a `altoP - 2`, y los tres
+   pisos de arriba quedan de copa limpia acabando en punta. Antes subía hasta `altoP` y
+   asomaba por encima.
+
+**Los árboles llevan su `especie` apuntada** porque `manzanos()` coge "los más cercanos" y
+sin filtrar salían manzanas clavadas en la pinocha de los pinos — y a la altura que no era,
+porque el pino es bastante más alto.
+
+**Medir la forma de un árbol en la rejilla sólo vale si está SOLO.** Se plantan cada 6
+bloques y las copas se entrelazan: la del vecino ocupa celdas que serían de éste, y como
+una copa no pisa lo que ya está puesto, quedan de `LEAVES` en medio de un pino. Una prueba
+de "¿es cónico?" daba tres pinos del revés que estaban perfectos. Ahora sólo mide los que
+no tienen otro árbol a menos de 8 bloques. Lo que sí vale para todos es la columna del
+tronco: ésa es suya y no se la puede quedar nadie.
+
 Los cocos son **bloques del mundo** (`COCO`), no una malla colgada como las manzanas: al
 coger uno desaparece del árbol de verdad. Eso pidió un `World.setBlock` que no existía.
 **Ojo al chunk vecino**: la malla de cada uno mira una capa de bloques de alrededor

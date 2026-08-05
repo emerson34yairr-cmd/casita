@@ -129,6 +129,75 @@ async function entrar(page) {
   ok('las palmeras llevan cocos', bosque.cuenta.coco > 0 && bosque.cuenta.troncoP > 50,
      `${bosque.cuenta.coco} cocos en ${bosque.nPalm} palmeras apuntadas`);
 
+  /* Que el árbol no salga del revés. Se lee la columna del tronco de cada pino:
+     - arriba tiene que acabar en PINOCHA, no en tronco pelado asomando
+     - abajo tiene que verse tronco antes de que empiece la copa
+     - y la copa tiene que ser más ancha abajo que arriba, que es lo que la hace cono */
+  const pinos = await page.evaluate(() => {
+    const malos = { asomaTronco: 0, sinTronco: 0, alReves: 0, n: 0, solos: 0 };
+    const ejemplos = [];
+    /* La forma de la copa sólo se puede medir en un pino que esté SOLO. Los árboles
+       se plantan cada 6 bloques y las copas se entrelazan: la de un vecino ocupa
+       celdas que serían de éste (y al revés), así que en un bosque cerrado no hay
+       manera de saber en la rejilla dónde acaba uno y empieza el otro. Lo de arriba
+       —que no asome el tronco y que se vea por abajo— sí vale para todos, porque mira
+       la columna del tronco, que es suya y no se la puede quedar nadie. */
+    const vecinos = [...juego.world.arboles, ...juego.world.palmeras];
+    const solo = a => !vecinos.some(b => b !== a && Math.hypot(b.x - a.x, b.z - a.z) < 8);
+    for (const a of juego.world.arboles) {
+      if (a.especie !== 'pino') continue;
+      malos.n++;
+      const bx = Math.floor(a.x), bz = Math.floor(a.z), h = juego.world.height(bx, bz);
+      const col = [];
+      for (let y = h + 1; y <= h + 16; y++) col.push(juego.world.getBlock(bx, y, bz));
+      const ultimo = col.map((v, i) => [v, i]).filter(([v]) => v !== 0).pop();
+      const remate = ultimo ? ultimo[0] : 0;
+      if (remate !== 10) { malos.asomaTronco++; if (ejemplos.length < 3) ejemplos.push(`${bx},${bz} remata en ${remate}`); }
+      if (col[0] !== 6) malos.sinTronco++;              // el primer bloque debe ser tronco
+      /* Cono = la copa llega más lejos abajo que arriba.
+         Se mide el ALCANCE (hasta qué distancia llega la pinocha) y se coge el máximo
+         de varios niveles, no la anchura de uno solo: los árboles se plantan cada 6
+         bloques y las copas se entrelazan, así que un frondoso vecino le roba celdas
+         al pino —quedan de HOJA, porque la copa no pisa lo que ya está puesto— y
+         contar por nivel daba tres pinos "del revés" que están perfectamente. */
+      const alcance = y => { let r = 0;
+        for (let d = 1; d <= 3; d++) for (const [dx, dz] of [[d,0],[-d,0],[0,d],[0,-d]])
+          if (juego.world.getBlock(bx+dx, y, bz+dz) === 10) r = Math.max(r, d);
+        return r; };
+      const alto = ultimo ? ultimo[1] + 1 : 0;
+      const maxEntre = (a, b) => { let r = 0;
+        for (let dy = a; dy <= b; dy++) r = Math.max(r, alcance(h + dy)); return r; };
+      const mitad = Math.round(alto / 2);
+      if (!solo(a)) continue;
+      malos.solos++;
+      if (maxEntre(2, mitad) <= maxEntre(mitad + 1, alto))
+        { malos.alReves++; if (ejemplos.length < 3) ejemplos.push(`cono ${bx},${bz}`); }
+    }
+    return { ...malos, ejemplos };
+  });
+  ok('a los pinos no les asoma el tronco por arriba', pinos.asomaTronco === 0,
+     pinos.ejemplos.join(' · ') || `los ${pinos.n} rematan en copa`);
+  ok('y se les ve el tronco por abajo', pinos.sinTronco === 0);
+  ok('la copa del pino es más ancha abajo que arriba (los que están solos)',
+     pinos.solos >= 5 && pinos.alReves === 0,
+     pinos.alReves ? `${pinos.alReves} del revés de ${pinos.solos} solos`
+                   : `${pinos.solos} pinos sueltos, todos en cono (de ${pinos.n})`);
+
+  const manzanos = await page.evaluate(() => {
+    const m = juego.casa.arboles.map(a => {
+      const bx = Math.floor(a.x), bz = Math.floor(a.z), h = juego.world.height(bx, bz);
+      let pinocha = 0, hoja = 0;
+      for (let dy = 2; dy <= 10; dy++) for (const [dx, dz] of [[1,0],[-1,0],[0,1],[0,-1],[2,0],[-2,0]]) {
+        const v = juego.world.getBlock(bx+dx, h+dy, bz+dz);
+        if (v === 10) pinocha++; else if (v === 7) hoja++;
+      }
+      return { pinocha, hoja };
+    });
+    return { total: m.length, enPino: m.filter(x => x.pinocha > x.hoja).length };
+  });
+  ok('las manzanas no salen en los pinos', manzanos.enPino === 0,
+     `${manzanos.total} manzanos, ${manzanos.enPino} sobre pinocha`);
+
   /* Cada árbol UNA vez en la lista. plantTrees se llama por chunk y recorre una rejilla
      que se mete en los vecinos, así que sin cuidado cada árbol se apunta 3 ó 4 veces —
      y entonces "los 7 manzanos más cercanos" son 7 muebles encima de 2 árboles. */

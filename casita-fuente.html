@@ -1169,18 +1169,23 @@ class World {
           for (let dy = 1; dy <= alto; dy++) put(tx, h + dy, tz, WOOD, false);
 
         } else if (especie === 'pino') {
-          // cono a pisos: ancho abajo y en punta arriba, y más alto que el frondoso
-          const altoP = alto + 2 + Math.floor(hash01(gx, gz, this.seed + 57) * 3);
-          for (let dy = 2; dy <= altoP + 1; dy++) {
-            const f = (dy - 2) / (altoP - 1);              // 0 en la base de la copa, 1 en la punta
-            const r = 2.6 * (1 - f) + 0.2;
-            if (dy > altoP - 1) { put(tx, h + dy, tz, PINOCHA, true); continue; }
+          /* Cono: tronco pelado abajo, copa que va estrechando y acaba en punta.
+             Dos cosas que hay que respetar o el árbol se ve DEL REVÉS:
+             - la copa no puede arrancar del suelo (BASE deja el tronco a la vista)
+             - el tronco no puede pasar de donde la copa aún lo tapa, o asoma por
+               arriba y parece un palo clavado en un montón de hojas. */
+          const altoP = alto + 3 + Math.floor(hash01(gx, gz, this.seed + 57) * 2);   // 7..10
+          const BASE = 3;                                  // primer piso de copa
+          for (let dy = BASE; dy <= altoP + 1; dy++) {
+            const f = (dy - BASE) / (altoP + 1 - BASE);    // 0 abajo del todo, 1 en la punta
+            const r = 2.4 * (1 - f) + 0.35;
             for (let dz = -3; dz <= 3; dz++) for (let dx = -3; dx <= 3; dx++) {
               if (Math.hypot(dx, dz) > r) continue;
               put(tx + dx, h + dy, tz + dz, PINOCHA, true);
             }
           }
-          for (let dy = 1; dy <= altoP; dy++) put(tx, h + dy, tz, WOOD, false);
+          // hasta altoP-2: los tres pisos de arriba quedan de copa limpia
+          for (let dy = 1; dy <= altoP - 2; dy++) put(tx, h + dy, tz, WOOD, false);
 
         } else {
           /* palmera: tronco pelado y un penacho de hojas arriba. Las de la orilla son
@@ -1216,7 +1221,7 @@ class World {
            manzanas superpuestos y seis avisos de fruta madura por árbol.
            El tronco sólo cae en un chunk: ése es el dueño del apunte. */
         if (especie !== 'palmera' && suyo && this.arboles.length < 2000)
-          this.arboles.push({ x: tx + 0.5, z: tz + 0.5, y: h, alto: alto });
+          this.arboles.push({ x: tx + 0.5, z: tz + 0.5, y: h, alto, especie });
       }
     }
   }
@@ -2085,6 +2090,9 @@ class Casa {
   manzanos(world) {
     this.arboles = [];
     const cerca = world.arboles
+      // sólo los frondosos: en un pino las manzanas quedaban clavadas en la pinocha, y
+      // además a la altura que no era, porque el pino es bastante más alto
+      .filter(a => a.especie === 'frondoso')
       .filter(a => Math.hypot(a.x - CASA.x, a.z - CASA.z) < 30)
       .sort((p, q) => Math.hypot(p.x, p.z) - Math.hypot(q.x, q.z))
       .slice(0, 7);
