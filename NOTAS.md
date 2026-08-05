@@ -213,6 +213,17 @@ ocupan sitio llevan un `estorba: [x0,z0,x1,z1]` en su receta y `ponerAdorno()` s
 mundo entero dos veces, son ~160 ms de parón, y es un tirón feo por poner una torrecita de
 piedras. El móvil y la guirnalda no llevan hueco porque cuelgan.
 
+## El cofre y el total (v:5)
+
+Hay DOS contadores: `inventario` (lo que llevas ahora, baja al comer o al fabricar) y
+`total` (lo que has juntado desde siempre, **no baja nunca**). El cofre enseña el segundo:
+comerse un pez o gastar tres conchas en el móvil no debería borrar que las encontraste.
+
+Los dos suben en `anotar()`, que sigue siendo la única puerta de entrada.
+
+Una partida anterior a esto no trae `tot`. Se siembra con lo que lleve encima al entrar,
+que es lo más cerca de la verdad que se puede estar sin inventarse un historial.
+
 ## El zurrón, el taller y el guardado v4
 
 El inventario dejó de ser un contador. Dos cosas lo usan:
@@ -267,13 +278,13 @@ cada partida para poder guardar "la número 7 ya la recogí".
       conchas, piedras, estrellas y el tesoro se fabrican cinco adornos para la casa.
 - [x] ~~Árboles de más de una clase, y uno con fruta~~ — hecho: pinos, palmeras y el
       frondoso de siempre; las palmeras dan cocos.
-- [ ] **Una receta que use cocos**: son la única cosa del zurrón que no sirve para
-      fabricar. Una maceta, o un cuenco.
-- [ ] **Más recetas**: ahora son cinco y se acaban. Un banco para el porche, una alfombra,
-      un farol para dentro. Añadir una es una entrada en `RECETAS` y su rama en
-      `Casa.adorno()`.
-- [ ] **Que el cofre se abra** y enseñe de verdad lo que llevas dentro: ahora es un adorno.
-- [ ] **Más muebles usables**: estantería para leer, ducha, escritorio.
+- [x] ~~Una receta que use cocos~~ — hecho: maceta y alfombra.
+- [x] ~~Que el cofre se abra~~ — hecho: enseña todo lo juntado desde el primer día.
+- [x] ~~Más muebles usables~~ — hecho: estantería y escritorio. Queda la ducha.
+- [ ] **Más recetas**: siete se acaban también. Un banco para el porche, un farol de dentro.
+- [ ] **Sitio dentro de casa**: el interior está lleno. Para meter otro mueble hay que
+      mirar los `rect` de todos los de dentro y buscar hueco de verdad — dos plantas de
+      interior, en (-6,8, 4,4) y (6,5, -0,7), son fáciles de olvidar y ya pasó.
 - [ ] **Estaciones o al menos un otoño**: las hojas de los árboles tirando a naranja según el día.
 - [ ] **Un diario de la casa**: "día 4, llovió, cosechaste dos tomates".
 - [ ] **Sonido de pasos** según el suelo que pisas (hierba, madera, arena).

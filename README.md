@@ -17,7 +17,8 @@ y se ve a pantalla completa (el propio juego te lo recuerda la primera vez).
 - **El gato va a lo suyo**: si lo dejas un rato se busca la vida según lo que necesite —
   se va a dormir, come, se arrima al fuego, toma el sol, se queda mirando el mar o pasea.
   En cuanto tocas algo, suelta y te obedece
-- Casa con muebles usables: cama, cocina, sofá, tele, mesa y **hogar encendido**
+- Casa con muebles usables: cama, cocina, sofá, tele, mesa, **estantería**, **escritorio**
+  y **hogar encendido**
 - **Huerto**: se siembra, se riega y se cosecha (si llueve, se riega solo)
 - **Manzanos** con fruta que vuelve a salir
 - **Muelle para pescar**: echas el sedal, esperas, y cuando pica hay que recoger a tiempo.
@@ -30,7 +31,9 @@ y se ve a pantalla completa (el propio juego te lo recuerda la primera vez).
 - **Taller** (tecla `T` o el botón 🔨): con conchas, piedras, estrellas y el tesoro se hacen
   cinco adornos para la casa — un móvil para la puerta, un farolillo que se enciende solo de
   noche, un mojón de piedras, una guirnalda de estrellas y el cofre del tesoro. Cada uno se
-  hace una vez y se queda puesto
+  hace una vez y se queda puesto. Con los cocos salen además una maceta y una alfombra
+- **El cofre se abre**: te enseña todo lo que has juntado desde el primer día — y ese
+  número no baja aunque te comas el pez o gastes las conchas
 - Ciclo de día y noche con luciérnagas, estrellas y las ventanas encendidas
 - **Chimenea con humo**, mariposas, nubes y **chubascos** de vez en cuando
 - Sonido ambiente sintetizado: viento, pájaros de día, grillos de noche, lluvia, y **pasos

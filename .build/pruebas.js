@@ -10,7 +10,7 @@ const THREE_JS = fs.readFileSync('/workspace/casita/.build/three-inline.html', '
 
 const r = [];
 const ok = (q, c, det) => { r.push({ q, c, det }); console.log(`${c ? '  OK  ' : ' FALLO'} ${q}${det ? '  — ' + det : ''}`); };
-const RECETAS_IDS = ['movil', 'farolillo', 'mojon', 'guirnalda', 'cofre'];
+const RECETAS_IDS = ['movil', 'farolillo', 'mojon', 'guirnalda', 'maceta', 'alfombra', 'cofre'];
 
 async function nuevaPagina(browser, borrarAlmacen) {
   const ctx = await browser.newContext({ viewport: { width: 1100, height: 720 } });
@@ -369,8 +369,11 @@ async function entrar(page) {
       botonVisible: document.getElementById('abrirTaller').classList.contains('on'),
     };
   });
-  ok('el taller abre con todas las recetas', taller.abierto && taller.recetas === 5, taller.nombres.join(' · '));
-  ok('sólo deja hacer lo que alcanza el material', JSON.stringify(taller.sePuede) === '[true,false,false,false,false]',
+  ok('el taller abre con todas las recetas', taller.abierto && taller.recetas === RECETAS_IDS.length,
+     taller.nombres.join(' · '));
+  // con 3 conchas y 1 piedra sólo alcanza para el móvil
+  ok('sólo deja hacer lo que alcanza el material',
+     taller.sePuede[0] === true && taller.sePuede.slice(1).every(v => v === false),
      taller.sePuede.map((s, i) => (s ? '✓' : '✗') + taller.nombres[i].split(' ')[0]).join(' '));
   ok('el botón del taller aparece al tener material', taller.botonVisible);
 
@@ -388,6 +391,53 @@ async function entrar(page) {
   ok('fabricar deja el adorno puesto en la casa', hecho.hayAdorno && hecho.enEscena, hecho.texto);
   ok('y gasta el material', hecho.inv === '{}', `zurrón: ${hecho.inv}`);
   ok('y la receta queda marcada como hecha', hecho.filaHecha && hecho.fabricados.join() === 'movil');
+
+  /* ============ 3d. los muebles nuevos ============ */
+  const muebles = await page.evaluate(() => {
+    const nombres = juego.casa.muebles.map(m => m.nombre);
+    const dentro = juego.casa.muebles.filter(m => ['Estantería', 'Escritorio'].includes(m.nombre));
+    // ¿se pisan con algún otro mueble de dentro? (los de fuera tienen sus propias reglas)
+    const deDentro = juego.casa.muebles.filter(m =>
+      ['Cama','Cocina','Sofá','Tele','Mesa','Hogar','Estantería','Escritorio','Planta'].includes(m.nombre));
+    const choques = [];
+    for (let i = 0; i < deDentro.length; i++) for (let j = i + 1; j < deDentro.length; j++) {
+      const a = deDentro[i].rect, b = deDentro[j].rect;
+      if (a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3])
+        choques.push(deDentro[i].nombre + ' con ' + deDentro[j].nombre);
+    }
+    const b = juego.casa.bordes;
+    const fuera = dentro.filter(m => m.rect[0] < b.x0 || m.rect[2] > b.x1 || m.rect[1] < b.z0 || m.rect[3] > b.z1);
+    return {
+      hay: dentro.length,
+      necesidades: dentro.map(m => m.nombre + '→' + m.need),
+      anclasLibres: dentro.every(m => juego.nav.caminable(m.anclaX, m.anclaZ)),
+      choques, fuera: fuera.map(m => m.nombre),
+      total: nombres.length,
+    };
+  });
+  ok('están la estantería y el escritorio', muebles.hay === 2, muebles.necesidades.join(' · '));
+  ok('no se pisan con ningún mueble de dentro', muebles.choques.length === 0,
+     muebles.choques.join(' · ') || 'ninguno se solapa');
+  ok('caben dentro de la casa', muebles.fuera.length === 0, muebles.fuera.join(' · ') || 'los dos dentro');
+  ok('se puede llegar a usarlos', muebles.anclasLibres);
+
+  const usarNuevo = await page.evaluate(async () => {
+    const esperar = ms => new Promise(r => setTimeout(r, ms));
+    const m = juego.casa.muebles.find(x => x.nombre === 'Estantería');
+    juego.necesidades.diversion = 30;
+    juego.persona.x = m.anclaX; juego.persona.z = m.anclaZ;
+    juego.usar(m);
+    const t0 = juego.tiempo;
+    while (juego.persona.estado !== 'usando' && juego.tiempo - t0 < 40) await esperar(200);
+    const usando = juego.persona.estado === 'usando';
+    const antes = juego.necesidades.diversion;
+    const t1 = juego.tiempo;
+    while (juego.tiempo - t1 < 8) await esperar(200);
+    return { usando, antes: Math.round(antes), despues: Math.round(juego.necesidades.diversion) };
+  });
+  ok('leer en la estantería sube la diversión', usarNuevo.usando && usarNuevo.despues > usarNuevo.antes,
+     `${usarNuevo.antes} → ${usarNuevo.despues}`);
+  await page.evaluate(() => juego.parar(true));
 
   const repe = await page.evaluate(() => {
     juego.inventario = { concha: 9, piedra: 9 };
@@ -411,7 +461,7 @@ async function entrar(page) {
     return { crudo: localStorage.getItem('casita_partida'), inv: JSON.stringify(juego.inventario) };
   });
   const gj = JSON.parse(guardado.crudo);
-  ok('el guardado sube a v4', gj.v === 4, JSON.stringify(gj).slice(0, 130) + '…');
+  ok('el guardado sube a v5', gj.v === 5, JSON.stringify(gj).slice(0, 130) + '…');
   ok('lo fabricado va dentro', Array.isArray(gj.f) && gj.f.join() === 'movil', JSON.stringify(gj.f));
   ok('el huerto va dentro', Array.isArray(gj.h) && gj.h.length === 6, JSON.stringify(gj.h));
   ok('el zurrón va dentro', !!gj.i && Object.keys(gj.i).length > 0, JSON.stringify(gj.i));
@@ -489,6 +539,40 @@ async function entrar(page) {
   ok('no se atraviesan los adornos que ocupan sitio',
      !Object.values(navAdornos).includes('SE ATRAVIESA'),
      Object.entries(navAdornos).map(([k, v]) => k + ': ' + v).join(' · '));
+  /* ============ 3e. el cofre se abre y enseña la colección ============ */
+  const cofre = await page.evaluate(() => {
+    juego.inventario = {}; juego.total = {}; juego.fabricados = [];
+    juego.anotar('concha', 3); juego.anotar('coco', 2);
+    juego.inventario.concha = 1;               // como si hubieras gastado dos
+    const r = RECETAS.find(x => x.id === 'cofre');
+    juego.inventario.tesoro = 1; juego.inventario.piedra = 3;
+    const hecho = juego.fabricar('cofre');
+    const m = juego.casa.muebles.find(x => x.tipo === 'cofre');
+    return { hecho, hayMueble: !!m, ancla: m && juego.nav.caminable(m.anclaX, m.anclaZ),
+             total: JSON.stringify(juego.total) };
+  });
+  ok('fabricar el cofre le pone su mueble', cofre.hecho && cofre.hayMueble && cofre.ancla);
+  ok('el total no baja al gastar cosas', JSON.parse(cofre.total).concha === 3,
+     `llevas 1 concha pero el cofre recuerda ${JSON.parse(cofre.total).concha}`);
+
+  const panel = await page.evaluate(() => {
+    juego.verColeccion(true);
+    const filas = [...document.querySelectorAll('#coleccion li')].map(li => li.textContent.replace(/\s+/g,' ').trim());
+    const abierto = document.getElementById('coleccion').classList.contains('on');
+    document.getElementById('cerrarCofre').click();
+    return { abierto, cerrado: !document.getElementById('coleccion').classList.contains('on'), filas };
+  });
+  ok('el cofre abre el panel de la colección', panel.abierto && panel.cerrado, panel.filas.join(' | '));
+  ok('y distingue lo que llevas de lo que juntaste',
+     panel.filas.some(f => f.includes('3') && f.includes('llevas 1')),
+     panel.filas[0] || '(vacío)');
+
+  const cofreVacio = await page.evaluate(() => {
+    juego.total = {}; juego.pintarColeccion();
+    return document.querySelector('#coleccion li').className;
+  });
+  ok('el cofre vacío lo dice en vez de salir en blanco', cofreVacio === 'nada');
+
   await page.screenshot({ path: `${OUT}/adornos.png` });
   await page.close(); await ctx.close();
 

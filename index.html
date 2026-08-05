@@ -96,7 +96,22 @@ if ('serviceWorker' in navigator) {
     padding:16px 18px; width:min(340px, calc(100vw - 36px)); max-height:min(78vh, 560px);
     overflow-y:auto; pointer-events:auto; display:none; z-index:6;
   }
-  #taller.on { display:block; }
+  #taller.on, #coleccion.on { display:block; }
+  #coleccion {
+    position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+    padding:16px 18px; width:min(320px, calc(100vw - 36px)); max-height:min(78vh, 560px);
+    overflow-y:auto; pointer-events:auto; display:none; z-index:6;
+  }
+  #coleccion h2 { font-size:15px; font-weight:600; margin-bottom:3px; }
+  #coleccion .sub { font-size:11.5px; color:var(--tinta2); margin-bottom:12px; }
+  #coleccion ul { list-style:none; }
+  #coleccion li { display:flex; align-items:center; gap:9px; padding:5px 0; border-top:1px solid var(--crema2); font-size:13px; }
+  #coleccion li:first-child { border-top:none; }
+  #coleccion li .em { font-size:17px; width:22px; text-align:center; }
+  #coleccion li .nom { flex:1; }
+  #coleccion li .n { font-variant-numeric:tabular-nums; color:var(--tinta2); font-size:12px; }
+  #coleccion li .n b { color:var(--tinta); font-size:13px; }
+  #coleccion .nada { font-size:12px; color:var(--tinta2); line-height:1.5; }
   #taller h2 { font-size:15px; font-weight:600; margin-bottom:3px; }
   #taller .sub { font-size:11.5px; color:var(--tinta2); margin-bottom:12px; }
   .receta { display:flex; gap:10px; align-items:flex-start; padding:9px 0; border-top:1px solid var(--crema2); }
@@ -116,7 +131,7 @@ if ('serviceWorker' in navigator) {
   .receta button:disabled { background:var(--crema2); color:#B0A28C; box-shadow:none; cursor:default; }
   .receta.hecha .nom { color:var(--tinta2); }
   .receta .listo { font-size:11.5px; color:#7A9A73; align-self:center; font-weight:600; }
-  #cerrarTaller {
+  #cerrarTaller, #cerrarCofre {
     pointer-events:auto; cursor:pointer; border:none; font-family:inherit; width:100%;
     margin-top:12px; background:var(--crema2); color:var(--tinta2);
     padding:8px; border-radius:10px; font-size:12.5px;
@@ -364,6 +379,13 @@ if ('serviceWorker' in navigator) {
     <button id="cerrarTaller">Cerrar</button>
   </div>
 
+  <div id="coleccion" class="card">
+    <h2>El cofre</h2>
+    <div class="sub">Todo lo que has ido juntando desde el primer día.</div>
+    <ul></ul>
+    <button id="cerrarCofre">Cerrar</button>
+  </div>
+
   <div id="clock" class="card">
     <div>
       <div id="hora">08:00</div>
@@ -521,6 +543,13 @@ const RECETAS = [
   { id: 'guirnalda', nombre: 'Guirnalda de estrellas', emoji: '✨',
     pide: { estrella: 3 },
     dice: 'Para la pared del fondo, dentro de casa.' },
+  { id: 'maceta', nombre: 'Maceta de coco', emoji: '🪴',
+    pide: { coco: 1, piedra: 1 },
+    dice: 'Media cáscara con una planta dentro, junto a la puerta.',
+    estorba: [-2.7, 6.0, -1.7, 7.0] },
+  { id: 'alfombra', nombre: 'Alfombra de fibra', emoji: '🟫',
+    pide: { coco: 2, concha: 2 },
+    dice: 'Trenzada con la fibra del coco, para el suelo del salón.' },
   { id: 'cofre', nombre: 'Cofre del tesoro', emoji: '🧰',
     pide: { tesoro: 1, piedra: 3 },
     dice: 'Donde guardar lo que saques del mar. Junto al hogar.',
@@ -1730,6 +1759,7 @@ class Casa {
 
     /* ---- muebles ---- */
     this.cama(); this.cocina(); this.sofa(); this.tele(); this.mesa();
+    this.estanteria(); this.escritorio();
     this.planta(-6.8, 4.4); this.planta(6.5, -0.7);
     this.lampara(1.0, 0.0);
     this.alfombra(4.6, 2.2, 4.4, 3.4, TINTE.rosa);
@@ -2075,6 +2105,22 @@ class Casa {
         }
         c.caja(ox, y - caida - 0.12, z, 0.15, 0.15, 0.08, T.liso, '#F0D68C', 0.22);
       }
+    } else if (id === 'maceta') {
+      // media cáscara de coco con una mata dentro, en el suelo junto a la puerta
+      const x = -2.2, z = 6.5, y = suelo(x, z);
+      c.caja(x, y + 0.16, z, 0.62, 0.32, 0.62, T.liso, '#7C583B', 0.3);
+      c.caja(x, y + 0.34, z, 0.5, 0.08, 0.5, T.liso, '#6B4A31', 0.25);
+      c.caja(x, y + 0.5, z, 0.1, 0.3, 0.1, T.liso, '#6B8E4E', 0.25);
+      for (const [ox, oz] of [[-0.2, -0.1], [0.2, 0.05], [0, 0.22]])
+        c.caja(x + ox, y + 0.62, z + oz, 0.34, 0.14, 0.3, T.hojas, '#7FB069', 0.3);
+      c.caja(x + 0.05, y + 0.78, z, 0.26, 0.12, 0.24, T.hojas, '#8FBE86', 0.3);
+    } else if (id === 'alfombra') {
+      // plana en el suelo del salón: se pisa, así que no lleva hueco en la rejilla
+      const x = 0.2, z = 0.4;
+      c.caja(x, PISO + 0.03, z, 3.0, 0.06, 2.2, T.tela, '#C8A87C', 0.55);
+      c.caja(x, PISO + 0.05, z, 2.5, 0.05, 1.75, T.tela, '#D8BE96', 0.5);
+      for (const dz of [-0.95, 0.95]) c.caja(x, PISO + 0.05, z + dz, 2.9, 0.05, 0.16, T.tela, '#A8875E', 0.5);
+      for (const dx of [-1.4, 1.4]) c.caja(x + dx, PISO + 0.05, z, 0.16, 0.05, 2.1, T.tela, '#A8875E', 0.5);
     } else if (id === 'cofre') {
       // junto al hogar, contra el muro norte
       const x = -1.7, z = -4.5;
@@ -2291,6 +2337,78 @@ class Casa {
     }
     c.caja(-2.85, PISO + 1.03, 3.05, 0.3, 0.2, 0.3, T.liso, '#FFFFFF', 0.4);
     c.caja(-2.30, PISO + 0.99, 3.40, 0.5, 0.12, 0.5, T.tela, TINTE.rosa, 0.4);
+    m.grupo.add(c.malla(this.material()));
+    this.muebles.push(m);
+  }
+
+  /* Estantería: contra el muro este, al SUR de la tele. Los sitios de dentro están muy
+     peleados — hay que esquivar la ventana del este (z de -4,1 a -2,1), la cocina, la
+     tele y la planta de (6,5, -0,7). Este rincón es de los pocos que quedan libres. */
+  estanteria() {
+    const X = 6.95, Z = 4.5;
+    const m = new Mueble({
+      nombre: 'Estantería', emoji: '📚', accion: 'leyendo', verbo: 'Leer un rato',
+      need: 'diversion', tasa: 8, need2: 'energia', tasa2: 1.2,
+      x: X, z: Z, anclaX: 5.7, anclaZ: Z, mirar: Math.PI / 2, pose: 'de pie',
+      rect: [6.3, 3.7, 7.45, 5.3]
+    });
+    const c = this.nuevo();
+    for (const dz of [-0.72, 0.72])
+      c.caja(X, PISO + 1.05, Z + dz, 0.52, 2.1, 0.12, T.tabla, TINTE.maderaM, 0.6);
+    c.caja(X + 0.23, PISO + 1.05, Z, 0.07, 2.1, 1.56, T.tabla, TINTE.maderaC, 0.5);
+    const baldas = [0.06, 0.58, 1.10, 1.62, 2.08];
+    for (const a of baldas) c.caja(X, PISO + a, Z, 0.52, 0.08, 1.44, T.tabla, TINTE.maderaC, 0.5);
+
+    // los libros: lomos de anchos y altos distintos, con algún hueco
+    const rnd = mulberry32(7712);
+    const lomos = ['#C46A5E', '#D9A05B', '#7A9A73', '#6E88A8', '#B58BB0', '#E0C06A', '#8C6A55'];
+    for (let b = 0; b < 4; b++) {
+      let z = Z - 0.62;
+      while (z < Z + 0.56) {
+        const w = 0.085 + rnd() * 0.075, alt = 0.3 + rnd() * 0.11;
+        c.caja(X - 0.05, PISO + baldas[b] + 0.04 + alt / 2, z + w / 2,
+               0.34, alt, w, T.liso, lomos[Math.floor(rnd() * lomos.length)], 0.25);
+        z += w + 0.015;
+        if (rnd() < 0.13) z += 0.16;                 // un hueco, que no es una biblioteca
+      }
+    }
+    // un par de libros tumbados arriba del todo
+    c.caja(X - 0.02, PISO + 2.18, Z + 0.28, 0.4, 0.09, 0.5, T.liso, '#9E7B62', 0.25);
+    c.caja(X - 0.02, PISO + 2.26, Z + 0.25, 0.36, 0.07, 0.44, T.liso, '#C46A5E', 0.25);
+    m.grupo.add(c.malla(this.material()));
+    this.muebles.push(m);
+  }
+
+  /* Escritorio: muro oeste, en el hueco justo entre el hogar (que llega a z=1,4) y la
+     planta de (-6,8, 4,4) (que empieza en z=3,8). Son 2,4 de sitio y ocupa 2,2. */
+  escritorio() {
+    const X = -6.8, Z = 2.6, SX = -5.75;              // SX = donde queda la silla
+    const m = new Mueble({
+      nombre: 'Escritorio', emoji: '✏️', accion: 'escribiendo', verbo: 'Escribir un rato',
+      need: 'diversion', tasa: 6.5, need2: 'energia', tasa2: 1.0,
+      x: X, z: Z, anclaX: -4.5, anclaZ: Z, mirar: -Math.PI / 2,
+      pose: 'sentado', poseX: SX, poseZ: Z, poseY: 0.5, poseRot: -Math.PI / 2,
+      rect: [-7.45, 1.5, -5.35, 3.7]
+    });
+    const c = this.nuevo();
+    c.caja(X, PISO + 0.86, Z, 1.25, 0.12, 2.0, T.tabla, TINTE.maderaC, 0.6);
+    for (const dz of [-0.85, 0.85])
+      c.caja(X + 0.5, PISO + 0.42, Z + dz, 0.12, 0.86, 0.12, T.tabla, TINTE.maderaM, 0.5);
+    // cajonera bajo el tablero, con sus dos tiradores
+    c.caja(X - 0.16, PISO + 0.42, Z - 0.6, 0.9, 0.76, 0.85, T.tabla, TINTE.maderaM, 0.55);
+    for (const dy of [0.28, 0.6])
+      c.caja(X + 0.3, PISO + dy, Z - 0.6, 0.05, 0.1, 0.26, T.liso, TINTE.metal, 0.2);
+    // silla
+    c.caja(SX, PISO + 0.44, Z, 0.72, 0.1, 0.72, T.tabla, TINTE.maderaC, 0.5);
+    c.caja(SX + 0.31, PISO + 0.78, Z, 0.1, 0.62, 0.68, T.tabla, TINTE.maderaM, 0.5);
+    for (const dx of [-0.28, 0.28]) for (const dz of [-0.28, 0.28])
+      c.caja(SX + dx, PISO + 0.2, Z + dz, 0.08, 0.44, 0.08, T.tabla, TINTE.maderaM, 0.45);
+    // lo que hay encima: papeles, tintero y una taza
+    c.caja(X + 0.06, PISO + 0.94, Z + 0.3, 0.55, 0.04, 0.7, T.liso, TINTE.hoja, 0.15);
+    c.caja(X + 0.02, PISO + 0.975, Z + 0.38, 0.46, 0.03, 0.58, T.liso, TINTE.crema, 0.15);
+    c.caja(X - 0.3, PISO + 1.0, Z + 0.9, 0.2, 0.2, 0.2, T.liso, TINTE.tinta, 0.2);
+    c.caja(X - 0.3, PISO + 1.11, Z + 0.9, 0.05, 0.24, 0.05, T.liso, '#D9A05B', 0.2);
+    c.caja(X - 0.28, PISO + 0.99, Z - 0.5, 0.28, 0.28, 0.28, T.liso, TINTE.mostaza, 0.3);
     m.grupo.add(c.malla(this.material()));
     this.muebles.push(m);
   }
@@ -4016,7 +4134,8 @@ class Juego {
     this.ray = new THREE.Raycaster();
 
     this.necesidades = { energia: 74, hambre: 62, diversion: 68 };
-    this.inventario = {};        // lo que se ha ido juntando: {concha: 3, dorada: 1, …}
+    this.inventario = {};        // lo que llevas encima ahora: {concha: 3, dorada: 1, …}
+    this.total = {};             // y lo que has juntado DESDE SIEMPRE, que no baja al gastarlo
     this.fabricados = [];        // los adornos ya hechos, por su id
     this.ocio = 0;               // segundos desde la última vez que tocaste algo
     this.auto = null;            // lo que el gato está haciendo por su cuenta
@@ -4051,6 +4170,8 @@ class Juego {
       taller: document.getElementById('taller'),
       recetas: document.getElementById('recetas'),
       abrirTaller: document.getElementById('abrirTaller'),
+      coleccion: document.getElementById('coleccion'),
+      coleccionLista: document.querySelector('#coleccion ul'),
       needs: {}
     };
     document.querySelectorAll('.need').forEach(el => {
@@ -4144,7 +4265,8 @@ class Juego {
         // las de la orilla ya recogidas, por su número: así no reaparecen
         c: (this.casa.conchas || []).filter(m => m.recogida).map(m => m.idOrilla),
         f: this.fabricados,
-        v: 4   // versión del formato, por si algún día cambia
+        tot: this.total,
+        v: 5   // versión del formato, por si algún día cambia
       }));
     } catch (e) {}
   }
@@ -4178,6 +4300,14 @@ class Juego {
       for (const k in p.i)
         if (COSAS[k] && typeof p.i[k] === 'number' && p.i[k] > 0) this.inventario[k] = p.i[k] | 0;
     }
+    if (p.tot && typeof p.tot === 'object') {
+      for (const k in p.tot)
+        if (COSAS[k] && typeof p.tot[k] === 'number' && p.tot[k] > 0) this.total[k] = p.tot[k] | 0;
+    } else {
+      // partida de antes del cofre (v:4 o menos): no hay historial, así que se empieza
+      // por lo que lleve encima. Es lo más cerca de la verdad que se puede estar.
+      for (const k in this.inventario) this.total[k] = this.inventario[k];
+    }
     if (Array.isArray(p.c) && this.casa.conchas) {
       const fuera = new Set(p.c);
       for (const m of this.casa.conchas)
@@ -4201,6 +4331,9 @@ class Juego {
   anotar(cosa, n = 1) {
     if (!COSAS[cosa]) return 0;
     this.inventario[cosa] = (this.inventario[cosa] || 0) + n;
+    // el total no baja nunca: es lo que enseña el cofre, y comerse un pez o gastar
+    // unas conchas en un adorno no debería borrar que los encontraste
+    this.total[cosa] = (this.total[cosa] || 0) + n;
     this.pintarInventario();
     this.guardarPartida();
     return this.inventario[cosa];
@@ -4255,6 +4388,7 @@ class Juego {
     if (m.tipo === 'huerto' || m.tipo === 'manzano' || m.tipo === 'pesca' ||
         m.tipo === 'orilla' || m.tipo === 'cocotero')
       return this.usarFuera(m);
+    if (m.tipo === 'cofre') return this.abrirCofre(m);
     this.parar(true);
     this.sonido.toque();
     this.camara.seguir = true;
@@ -4378,7 +4512,11 @@ class Juego {
       if (e.code === 'KeyV') this.cambiarVista();
       if (e.code === 'KeyC') this.cambiarPersonaje();
       if (e.code === 'KeyG') this.alternarAgua();
-      if (e.code === 'Escape') { if (this.dom.taller.classList.contains('on')) this.verTaller(false); else this.parar(); }
+      if (e.code === 'Escape') {
+        if (this.dom.coleccion.classList.contains('on')) this.verColeccion(false);
+        else if (this.dom.taller.classList.contains('on')) this.verTaller(false);
+        else this.parar();
+      }
       if (e.code === 'KeyT') this.verTaller();
       if (e.code === 'Space') { e.preventDefault(); this.saltar(); }
       if (e.code === 'KeyP') this.alternarPausa();
@@ -4397,6 +4535,7 @@ class Juego {
     });
     this.dom.abrirTaller.addEventListener('click', () => this.verTaller(true));
     document.getElementById('cerrarTaller').addEventListener('click', () => this.verTaller(false));
+    document.getElementById('cerrarCofre').addEventListener('click', () => this.verColeccion(false));
     this.dom.recetas.addEventListener('click', e => {
       const b = e.target.closest('button[data-receta]');
       if (b && !b.disabled) this.fabricar(b.dataset.receta);
@@ -5133,6 +5272,58 @@ class Juego {
   ponerAdorno(r) {
     this.casa.adorno(r.id, this.world);
     if (r.estorba && this.nav) this.nav.bloquear(r.estorba[0], r.estorba[1], r.estorba[2], r.estorba[3]);
+    // el cofre, además de adorno, se puede abrir: se le pone su mueble para que el
+    // clic de siempre lo encuentre. Los demás sólo se miran.
+    if (r.id === 'cofre' && !this.cofreMueble) {
+      this.cofreMueble = new Mueble({
+        nombre: 'Cofre', emoji: '🧰', accion: 'mirando el cofre', verbo: 'Abrir el cofre',
+        tipo: 'cofre', x: -1.7, z: -4.5,
+        anclaX: -1.7, anclaZ: -3.3, mirar: Math.PI, pose: 'de pie',
+        rect: [-2.5, -5.0, -0.9, -4.0],
+        noEstorba: true          // el hueco ya lo puso ponerAdorno con `estorba`
+      });
+      this.casa.muebles.push(this.cofreMueble);
+      this.casa.grupo.add(this.cofreMueble.grupo);
+    }
+  }
+
+  /* ---- el cofre: enseña todo lo que has juntado desde el primer día ---- */
+  abrirCofre(m) {
+    this.parar(true);
+    this.sonido.toque();
+    this.camara.seguir = true;
+    this.texto('Va al cofre…');
+    this.persona.irA(m.anclaX, m.anclaZ, () => {
+      const p = this.persona;
+      p.ang = m.mirar;
+      p.emoji('🧰');
+      this.sonido.campanita();
+      this.texto('');
+      this.verColeccion(true);
+      setTimeout(() => { if (this.persona) this.persona.emoji(null); }, 2600);
+    }, m);
+  }
+  verColeccion(si) {
+    if (this.cargando) return;
+    const abierto = si === undefined ? !this.dom.coleccion.classList.contains('on') : si;
+    this.dom.coleccion.classList.toggle('on', abierto);
+    if (abierto) { this.tocado(); this.pintarColeccion(); }
+  }
+  pintarColeccion() {
+    if (!this.dom.coleccionLista) return;
+    const claves = Object.keys(COSAS).filter(k => this.total[k] > 0);
+    if (!claves.length) {
+      this.dom.coleccionLista.innerHTML =
+        '<li class="nada">Todavía está vacío. Recoge algo por la playa o echa el sedal en el muelle.</li>';
+      return;
+    }
+    this.dom.coleccionLista.innerHTML = claves.map(k => {
+      const llevas = this.inventario[k] || 0, todo = this.total[k];
+      return '<li><span class="em">' + COSAS[k].emoji + '</span>' +
+             '<span class="nom">' + COSAS[k].nombre.replace(/^(un|una) /, '') + '</span>' +
+             '<span class="n"><b>' + todo + '</b>' +
+             (llevas !== todo ? ' · llevas ' + llevas : '') + '</span></li>';
+    }).join('');
   }
 
   fabricar(id) {
